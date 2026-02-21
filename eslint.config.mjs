@@ -6,7 +6,7 @@ import eslintConfigPrettier from 'eslint-config-prettier'
 
 export default [
   {
-    ignores: ['prettier.config.cjs', 'eslint.config.mjs'],
+    ignores: ['prettier.config.cjs', 'eslint.config.mjs', 'routeTree.gen.ts'],
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,

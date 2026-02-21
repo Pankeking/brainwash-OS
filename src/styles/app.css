@@ -13,6 +13,8 @@
 @layer base {
   html {
     color-scheme: light dark;
+    /* Prevents pull-to-refresh if you want a more app-like feel */
+    overscroll-behavior-y: contain;
   }
 
   * {
@@ -22,6 +24,18 @@
   html,
   body {
     @apply text-gray-900 bg-gray-50 dark:bg-gray-950 dark:text-gray-200;
+    /* Extra insurance against horizontal shifting during zoom attempts */
+    overflow-x: hidden;
+  }
+
+  /* THE FIX: Setting inputs to 16px font-size prevents iOS Safari 
+     from auto-zooming. We use !important to ensure it overrides 
+     any utility classes that might be too small.
+  */
+  input,
+  textarea,
+  select {
+    font-size: 16px !important;
   }
 
   .using-mouse * {

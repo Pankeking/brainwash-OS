@@ -1,22 +1,17 @@
 /// <reference types="vite/client" />
-import {
-  HeadContent,
-  Link,
-  Outlet,
-  Scripts,
-  createRootRouteWithContext,
-} from '@tanstack/react-router'
-import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
-import { TanStackRouterDevtools } from '@tanstack/react-router-devtools'
+import { HeadContent, Outlet, Scripts, createRootRouteWithContext } from '@tanstack/react-router'
 import * as React from 'react'
-import type { QueryClient } from '@tanstack/react-query'
+import type { QueryClient as QueryClientType } from '@tanstack/react-query'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { DefaultCatchBoundary } from '~/components/DefaultCatchBoundary'
 import { NotFound } from '~/components/NotFound'
 import appCss from '~/styles/app.css?url'
-import { seo } from '~/utils/seo'
+import { AuthProvider } from '~/contexts/auth'
+
+const queryClient = new QueryClient()
 
 export const Route = createRootRouteWithContext<{
-  queryClient: QueryClient
+  queryClient: QueryClientType
 }>()({
   head: () => ({
     meta: [
@@ -27,10 +22,6 @@ export const Route = createRootRouteWithContext<{
         name: 'viewport',
         content: 'width=device-width, initial-scale=1',
       },
-      ...seo({
-        title: 'TanStack Start | Type-Safe, Client-First, Full-Stack React Framework',
-        description: `TanStack Start is a type-safe, client-first, full-stack React framework. `,
-      }),
     ],
     links: [
       { rel: 'stylesheet', href: appCss },
@@ -69,7 +60,11 @@ export const Route = createRootRouteWithContext<{
 function RootComponent() {
   return (
     <RootDocument>
-      <Outlet />
+      <QueryClientProvider client={queryClient}>
+        <AuthProvider>
+          <Outlet />
+        </AuthProvider>
+      </QueryClientProvider>
     </RootDocument>
   )
 }
@@ -80,71 +75,9 @@ function RootDocument({ children }: { children: React.ReactNode }) {
       <head>
         <HeadContent />
       </head>
-      <body>
-        <div className="p-2 flex gap-2 text-lg">
-          <Link
-            to="/"
-            activeProps={{
-              className: 'font-bold',
-            }}
-            activeOptions={{ exact: true }}
-          >
-            Home
-          </Link>{' '}
-          <Link
-            to="/workout"
-            activeProps={{
-              className: 'font-bold',
-            }}
-          >
-            Workout
-          </Link>{' '}
-          <Link
-            to="/posts"
-            activeProps={{
-              className: 'font-bold',
-            }}
-          >
-            Posts
-          </Link>{' '}
-          <Link
-            to="/users"
-            activeProps={{
-              className: 'font-bold',
-            }}
-          >
-            Users
-          </Link>{' '}
-          <Link
-            to="/route-a"
-            activeProps={{
-              className: 'font-bold',
-            }}
-          >
-            Pathless Layout
-          </Link>{' '}
-          <Link
-            to="/deferred"
-            activeProps={{
-              className: 'font-bold',
-            }}
-          >
-            Deferred
-          </Link>{' '}
-          <Link
-            // @ts-expect-error - This route does not exist
-            to="/this-route-does-not-exist"
-            activeProps={{
-              className: 'font-bold',
-            }}
-          >
-            This Route Does Not Exist
-          </Link>
-        </div>
+      <body className="p-2">
         <hr />
         {children}
-        <TanStackRouterDevtools position="bottom-right" />
-        <ReactQueryDevtools buttonPosition="bottom-left" />
         <Scripts />
       </body>
     </html>
