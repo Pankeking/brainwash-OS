@@ -64,45 +64,181 @@ const weeklyCategoryStatsInputSchema = z.object({
   weeks: z.number().int().min(1).max(24),
 })
 
-function parseSelectedDay(value: string) {
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) {
+const APP_TIMEZONE = 'Europe/Berlin'
+const SELECTED_DAY_KEY_REGEX = /^\d{4}-\d{2}-\d{2}$/
+
+function getDatePartsInTimeZone(date: Date, timeZone: string) {
+  const formatter = new Intl.DateTimeFormat('en-CA', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  })
+  const parts = formatter.formatToParts(date)
+  const year = Number(parts.find((part) => part.type === 'year')?.value)
+  const month = Number(parts.find((part) => part.type === 'month')?.value)
+  const day = Number(parts.find((part) => part.type === 'day')?.value)
+  return { year, month, day }
+}
+
+function getTimePartsInTimeZone(date: Date, timeZone: string) {
+  const formatter = new Intl.DateTimeFormat('en-GB', {
+    timeZone,
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  })
+  const parts = formatter.formatToParts(date)
+  const hour = Number(parts.find((part) => part.type === 'hour')?.value)
+  const minute = Number(parts.find((part) => part.type === 'minute')?.value)
+  const second = Number(parts.find((part) => part.type === 'second')?.value)
+  return { hour, minute, second }
+}
+
+function getTimeZoneOffsetMs(date: Date, timeZone: string) {
+  const parts = getDatePartsInTimeZone(date, timeZone)
+  const timeParts = getTimePartsInTimeZone(date, timeZone)
+  const asUtc = Date.UTC(
+    parts.year,
+    parts.month - 1,
+    parts.day,
+    timeParts.hour,
+    timeParts.minute,
+    timeParts.second,
+    date.getUTCMilliseconds(),
+  )
+  return asUtc - date.getTime()
+}
+
+function zonedDateTimeToUtc(
+  year: number,
+  month: number,
+  day: number,
+  hour: number,
+  minute: number,
+  second: number,
+  millisecond: number,
+  timeZone: string,
+) {
+  const utcGuess = Date.UTC(year, month - 1, day, hour, minute, second, millisecond)
+  const firstOffset = getTimeZoneOffsetMs(new Date(utcGuess), timeZone)
+  let timestamp = utcGuess - firstOffset
+  const secondOffset = getTimeZoneOffsetMs(new Date(timestamp), timeZone)
+  if (secondOffset !== firstOffset) {
+    timestamp = utcGuess - secondOffset
+  }
+  return new Date(timestamp)
+}
+
+function formatDayKey(year: number, month: number, day: number) {
+  return `${String(year).padStart(4, '0')}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+}
+
+function dayKeyFromDateInTimeZone(date: Date, timeZone: string) {
+  const parts = getDatePartsInTimeZone(date, timeZone)
+  return formatDayKey(parts.year, parts.month, parts.day)
+}
+
+function parseDayKey(value: string) {
+  if (!SELECTED_DAY_KEY_REGEX.test(value)) {
     throw new Error('Invalid selected day')
   }
-  date.setHours(0, 0, 0, 0)
-  return date
+  const [yearRaw, monthRaw, dayRaw] = value.split('-')
+  const year = Number(yearRaw)
+  const month = Number(monthRaw)
+  const day = Number(dayRaw)
+  const control = new Date(Date.UTC(year, month - 1, day))
+  if (
+    control.getUTCFullYear() !== year ||
+    control.getUTCMonth() + 1 !== month ||
+    control.getUTCDate() !== day
+  ) {
+    throw new Error('Invalid selected day')
+  }
+  return { year, month, day, key: formatDayKey(year, month, day) }
 }
 
-function getWeekdayFromDate(date: Date): Weekday {
-  const day = date.getDay()
-  if (day === 0) return Weekday.SUNDAY
-  if (day === 1) return Weekday.MONDAY
-  if (day === 2) return Weekday.TUESDAY
-  if (day === 3) return Weekday.WEDNESDAY
-  if (day === 4) return Weekday.THURSDAY
-  if (day === 5) return Weekday.FRIDAY
-  return Weekday.SATURDAY
+function parseSelectedDayKey(value: string) {
+  if (SELECTED_DAY_KEY_REGEX.test(value)) {
+    return parseDayKey(value).key
+  }
+  const legacyDate = new Date(value)
+  if (Number.isNaN(legacyDate.getTime())) {
+    throw new Error('Invalid selected day')
+  }
+  return dayKeyFromDateInTimeZone(legacyDate, APP_TIMEZONE)
 }
 
-function normalizeDayStart(value: Date) {
-  const date = new Date(value)
-  date.setHours(0, 0, 0, 0)
-  return date
+function addDaysToDayKey(dayKey: string, days: number) {
+  const parsed = parseDayKey(dayKey)
+  const date = new Date(Date.UTC(parsed.year, parsed.month - 1, parsed.day + days))
+  return formatDayKey(date.getUTCFullYear(), date.getUTCMonth() + 1, date.getUTCDate())
 }
 
-function getWeekStart(date: Date) {
-  const day = date.getDay()
+function getUtcRangeForDayKey(dayKey: string) {
+  const parsed = parseDayKey(dayKey)
+  const start = zonedDateTimeToUtc(parsed.year, parsed.month, parsed.day, 0, 0, 0, 0, APP_TIMEZONE)
+  const end = zonedDateTimeToUtc(
+    parsed.year,
+    parsed.month,
+    parsed.day,
+    23,
+    59,
+    59,
+    999,
+    APP_TIMEZONE,
+  )
+  return { start, end }
+}
+
+function getWeekdayFromDayKey(dayKey: string): Weekday {
+  const parsed = parseDayKey(dayKey)
+  const dayIndex = new Date(Date.UTC(parsed.year, parsed.month - 1, parsed.day)).getUTCDay()
+  const WEEKDAYS = Object.values(Weekday)
+  const enumIndex = (dayIndex + 6) % 7
+  return WEEKDAYS[enumIndex]
+}
+
+function getWeekStartDayKey(dayKey: string) {
+  const parsed = parseDayKey(dayKey)
+  const day = new Date(Date.UTC(parsed.year, parsed.month - 1, parsed.day)).getUTCDay()
   const mondayDiff = day === 0 ? -6 : 1 - day
-  const result = new Date(date)
-  result.setDate(result.getDate() + mondayDiff)
-  return normalizeDayStart(result)
+  return addDaysToDayKey(dayKey, mondayDiff)
 }
 
-function getWeekEnd(weekStart: Date) {
-  const end = new Date(weekStart)
-  end.setDate(end.getDate() + 6)
-  end.setHours(23, 59, 59, 999)
-  return end
+function getMonthRangeFromDayKey(dayKey: string) {
+  const parsed = parseDayKey(dayKey)
+  const first = formatDayKey(parsed.year, parsed.month, 1)
+  const lastDate = new Date(Date.UTC(parsed.year, parsed.month, 0))
+  const last = formatDayKey(parsed.year, parsed.month, lastDate.getUTCDate())
+  const start = getUtcRangeForDayKey(first).start
+  const end = getUtcRangeForDayKey(last).end
+  return { start, end }
+}
+
+function formatDayKeyForLabel(dayKey: string) {
+  return new Date(`${dayKey}T12:00:00.000Z`).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    timeZone: APP_TIMEZONE,
+  })
+}
+
+function createLogTimestampForDayKey(dayKey: string) {
+  const selected = parseDayKey(dayKey)
+  const now = new Date()
+  const timeParts = getTimePartsInTimeZone(now, APP_TIMEZONE)
+  return zonedDateTimeToUtc(
+    selected.year,
+    selected.month,
+    selected.day,
+    timeParts.hour,
+    timeParts.minute,
+    timeParts.second,
+    now.getMilliseconds(),
+    APP_TIMEZONE,
+  )
 }
 
 type FlatSetRecord = {
@@ -148,33 +284,40 @@ export const getWorkoutDayFn = createServerFn({ method: 'POST' })
   .handler(async ({ data }) => {
     await connectDB()
     const userId = await getAuthenticatedUserObjectId()
-    const selectedDate = parseSelectedDay(data.selectedDay)
-    const weekday = getWeekdayFromDate(selectedDate)
+    const selectedDayKey = parseSelectedDayKey(data.selectedDay)
+    const selectedDayRange = getUtcRangeForDayKey(selectedDayKey)
+    const weekday = getWeekdayFromDayKey(selectedDayKey)
+    const weekStartDayKey = getWeekStartDayKey(selectedDayKey)
+    const weekEndDayKey = addDaysToDayKey(weekStartDayKey, 6)
+    const weekRange = {
+      start: getUtcRangeForDayKey(weekStartDayKey).start,
+      end: getUtcRangeForDayKey(weekEndDayKey).end,
+    }
+    const monthRange = getMonthRangeFromDayKey(selectedDayKey)
 
     const [categories, weekView, workoutLog, weekRangeLogs, monthRangeLogs] = await Promise.all([
       ExerciseCategoryModel.find({ userId }).sort({ createdAt: 1 }).lean(),
       WeekViewModel.findOne({ userId, weekday }).lean(),
-      WorkoutLogModel.findOne({ userId, date: selectedDate, weekday }).lean(),
-      WorkoutLogModel.find({
+      WorkoutLogModel.findOne({
         userId,
+        weekday,
         date: {
-          $gte: getWeekStart(selectedDate),
-          $lte: getWeekEnd(getWeekStart(selectedDate)),
+          $gte: selectedDayRange.start,
+          $lte: selectedDayRange.end,
         },
       }).lean(),
       WorkoutLogModel.find({
         userId,
         date: {
-          $gte: new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1),
-          $lte: new Date(
-            selectedDate.getFullYear(),
-            selectedDate.getMonth() + 1,
-            0,
-            23,
-            59,
-            59,
-            999,
-          ),
+          $gte: weekRange.start,
+          $lte: weekRange.end,
+        },
+      }).lean(),
+      WorkoutLogModel.find({
+        userId,
+        date: {
+          $gte: monthRange.start,
+          $lte: monthRange.end,
         },
       }).lean(),
     ])
@@ -282,14 +425,17 @@ export const getWorkoutDayFn = createServerFn({ method: 'POST' })
                 return null
               }
 
-              const timestamp = new Date(selectedDate.getTime() + setIndex * 1000).toISOString()
+              const baseTimestamp = workoutLog?.date
+                ? new Date(workoutLog.date).getTime()
+                : Date.now()
+              const timestamp = new Date(baseTimestamp + setIndex * 1000).toISOString()
               return {
                 id: `${exerciseIndex}:${setIndex}`,
                 exerciseId,
                 exerciseName: exercise.name,
                 type: set.type,
                 value,
-                date: data.selectedDay,
+                date: selectedDayKey,
                 timestamp,
               }
             })
@@ -378,8 +524,8 @@ export const addWorkoutExerciseFn = createServerFn({ method: 'POST' })
   .handler(async ({ data }) => {
     await connectDB()
     const userId = await getAuthenticatedUserObjectId()
-    const selectedDate = parseSelectedDay(data.selectedDay)
-    const weekday = getWeekdayFromDate(selectedDate)
+    const selectedDayKey = parseSelectedDayKey(data.selectedDay)
+    const weekday = getWeekdayFromDayKey(selectedDayKey)
     const name = data.name.trim()
 
     const exercise = await ExerciseModel.findOneAndUpdate(
@@ -427,12 +573,20 @@ export const removeWorkoutExerciseFn = createServerFn({ method: 'POST' })
   .handler(async ({ data }) => {
     await connectDB()
     const userId = await getAuthenticatedUserObjectId()
-    const selectedDate = parseSelectedDay(data.selectedDay)
-    const weekday = getWeekdayFromDate(selectedDate)
+    const selectedDayKey = parseSelectedDayKey(data.selectedDay)
+    const selectedDayRange = getUtcRangeForDayKey(selectedDayKey)
+    const weekday = getWeekdayFromDayKey(selectedDayKey)
     const exerciseId = new mongoose.Types.ObjectId(data.exerciseId)
     await WeekViewModel.updateOne({ userId, weekday }, { $pull: { exercises: { exerciseId } } })
     await WorkoutLogModel.updateMany(
-      { userId, date: selectedDate, weekday },
+      {
+        userId,
+        weekday,
+        date: {
+          $gte: selectedDayRange.start,
+          $lte: selectedDayRange.end,
+        },
+      },
       { $pull: { exercises: { 'exercise.exerciseId': exerciseId } } },
     )
 
@@ -496,20 +650,24 @@ export const addWorkoutSetFn = createServerFn({ method: 'POST' })
   .handler(async ({ data }) => {
     await connectDB()
     const userId = await getAuthenticatedUserObjectId()
-    const selectedDate = parseSelectedDay(data.selectedDay)
-    const weekday = getWeekdayFromDate(selectedDate)
+    const selectedDayKey = parseSelectedDayKey(data.selectedDay)
+    const selectedDayRange = getUtcRangeForDayKey(selectedDayKey)
+    const weekday = getWeekdayFromDayKey(selectedDayKey)
     const exerciseId = new mongoose.Types.ObjectId(data.exerciseId)
 
     let workoutLog = await WorkoutLogModel.findOne({
       userId,
-      date: selectedDate,
       weekday,
+      date: {
+        $gte: selectedDayRange.start,
+        $lte: selectedDayRange.end,
+      },
     })
 
     if (!workoutLog) {
       workoutLog = await WorkoutLogModel.create({
         userId,
-        date: selectedDate,
+        date: createLogTimestampForDayKey(selectedDayKey),
         weekday,
         exercises: [],
       })
@@ -551,8 +709,9 @@ export const removeWorkoutSetFn = createServerFn({ method: 'POST' })
   .handler(async ({ data }) => {
     await connectDB()
     const userId = await getAuthenticatedUserObjectId()
-    const selectedDate = parseSelectedDay(data.selectedDay)
-    const weekday = getWeekdayFromDate(selectedDate)
+    const selectedDayKey = parseSelectedDayKey(data.selectedDay)
+    const selectedDayRange = getUtcRangeForDayKey(selectedDayKey)
+    const weekday = getWeekdayFromDayKey(selectedDayKey)
 
     const [exerciseIndexRaw, setIndexRaw] = data.logId.split(':')
     const exerciseIndex = Number(exerciseIndexRaw)
@@ -564,8 +723,11 @@ export const removeWorkoutSetFn = createServerFn({ method: 'POST' })
 
     const workoutLog = await WorkoutLogModel.findOne({
       userId,
-      date: selectedDate,
       weekday,
+      date: {
+        $gte: selectedDayRange.start,
+        $lte: selectedDayRange.end,
+      },
     })
     if (!workoutLog) {
       return { success: true }
@@ -596,19 +758,21 @@ export const getWorkoutWeeklyCategoryStatsFn = createServerFn({ method: 'POST' }
     await connectDB()
     const userId = await getAuthenticatedUserObjectId()
 
-    const now = new Date()
-    const currentWeekStart = getWeekStart(now)
+    const todayDayKey = dayKeyFromDateInTimeZone(new Date(), APP_TIMEZONE)
+    const currentWeekStartDayKey = getWeekStartDayKey(todayDayKey)
 
     const weekRanges = Array.from({ length: data.weeks }).map((_, index) => {
-      const start = new Date(currentWeekStart)
-      start.setDate(start.getDate() - index * 7)
-      const end = getWeekEnd(start)
-      const label = `${start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${end.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
+      const startDayKey = addDaysToDayKey(currentWeekStartDayKey, -index * 7)
+      const endDayKey = addDaysToDayKey(startDayKey, 6)
+      const start = getUtcRangeForDayKey(startDayKey).start
+      const end = getUtcRangeForDayKey(endDayKey).end
+      const label = `${formatDayKeyForLabel(startDayKey)} - ${formatDayKeyForLabel(endDayKey)}`
       return { start, end, label }
     })
 
-    const oldestStart = weekRanges[weekRanges.length - 1]?.start || currentWeekStart
-    const newestEnd = weekRanges[0]?.end || getWeekEnd(currentWeekStart)
+    const oldestStart =
+      weekRanges[weekRanges.length - 1]?.start || getUtcRangeForDayKey(todayDayKey).start
+    const newestEnd = weekRanges[0]?.end || getUtcRangeForDayKey(todayDayKey).end
 
     const [categories, exercises, logs] = await Promise.all([
       ExerciseCategoryModel.find({ userId }).sort({ createdAt: 1 }).lean(),

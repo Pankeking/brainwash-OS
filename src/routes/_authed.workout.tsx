@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { ChevronLeft, Trash2, History, PlusCircle, X, Check, Tag } from 'lucide-react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -59,13 +59,51 @@ const CATEGORY_COLORS: CategoryColorOption[] = [
   { name: 'Purple', hex: '#8B5CF6' },
 ]
 
+const TIME_ZONE = 'Europe/Berlin'
+
+function toDayKey(date: Date) {
+  const formatter = new Intl.DateTimeFormat('en-CA', {
+    timeZone: TIME_ZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  })
+  const parts = formatter.formatToParts(date)
+  const year = parts.find((part) => part.type === 'year')?.value
+  const month = parts.find((part) => part.type === 'month')?.value
+  const day = parts.find((part) => part.type === 'day')?.value
+  return `${year}-${month}-${day}`
+}
+
+function formatDayKey(dayKey: string) {
+  return new Date(`${dayKey}T12:00:00.000Z`).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    timeZone: TIME_ZONE,
+  })
+}
+
 export const Route = createFileRoute('/_authed/workout')({
+  loader: async () => {
+    const selectedDay = toDayKey(new Date())
+    const [workoutDayData, weeklyStatsData] = await Promise.all([
+      getWorkoutDayFn({ data: { selectedDay } }),
+      getWorkoutWeeklyCategoryStatsFn({ data: { weeks: 4 } }),
+    ])
+
+    return {
+      selectedDay,
+      workoutDayData,
+      weeklyStatsData,
+    }
+  },
   component: WorkoutView,
 })
 
 function WorkoutView() {
+  const loaderData = Route.useLoaderData()
   const queryClient = useQueryClient()
-  const [selectedDay, setSelectedDay] = useState(new Date().toDateString())
+  const [selectedDay, setSelectedDay] = useState(loaderData.selectedDay)
   const [isAddingExercise, setIsAddingExercise] = useState(false)
   const [isAddingCategory, setIsAddingCategory] = useState(false)
   const [newExerciseName, setNewExerciseName] = useState('')
@@ -87,11 +125,17 @@ function WorkoutView() {
   const { data, isLoading } = useQuery({
     queryKey: ['workout-day', selectedDay],
     queryFn: () => getWorkoutDayFn({ data: { selectedDay } }),
+    initialData: selectedDay === loaderData.selectedDay ? loaderData.workoutDayData : undefined,
+    staleTime: 30_000,
+    refetchOnWindowFocus: false,
   })
 
   const { data: weeklyStatsData, isLoading: isWeeklyStatsLoading } = useQuery({
     queryKey: ['workout-weekly-category-stats', weeksToShow],
     queryFn: () => getWorkoutWeeklyCategoryStatsFn({ data: { weeks: weeksToShow } }),
+    initialData: weeksToShow === 4 ? loaderData.weeklyStatsData : undefined,
+    staleTime: 30_000,
+    refetchOnWindowFocus: false,
   })
 
   const categories: Category[] = data?.categories || []
@@ -247,7 +291,14 @@ function WorkoutView() {
     })
   }
 
-  const filteredLogs: Log[] = logs
+  const filteredLogs = useMemo(() => logs.slice().reverse(), [logs])
+  const logCountByExercise = useMemo(() => {
+    const map = new Map<string, number>()
+    filteredLogs.forEach((log) => {
+      map.set(log.exerciseId, (map.get(log.exerciseId) || 0) + 1)
+    })
+    return map
+  }, [filteredLogs])
 
   return (
     <div className="min-h-screen bg-[#1A1F26] text-slate-100 p-5 font-sans pb-32">
@@ -256,7 +307,7 @@ function WorkoutView() {
           <ChevronLeft size={24} />
         </Link>
         <div className="bg-[#2A333E] px-3 py-1 rounded-md text-[10px] font-black tracking-widest border border-slate-700 uppercase text-slate-400">
-          {new Date(selectedDay).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+          {formatDayKey(selectedDay)}
         </div>
       </header>
 
@@ -402,7 +453,7 @@ function WorkoutView() {
                 }
                 onToggleExpand={(id) => setExpandedExerciseId((prev) => (prev === id ? null : id))}
                 isExpanded={expandedExerciseId === ex.id}
-                count={filteredLogs.filter((l) => l.exerciseId === ex.id).length}
+                count={logCountByExercise.get(ex.id) || 0}
                 stats={ex.stats}
               />
             ))}
@@ -419,72 +470,69 @@ function WorkoutView() {
               </div>
             ) : (
               <div className="space-y-2">
-                {filteredLogs
-                  .slice()
-                  .reverse()
-                  .map((log) => (
-                    <div
-                      key={log.id}
-                      className="bg-[#232a33]/40 p-3 rounded-xl flex justify-between items-center border border-slate-700/20"
-                    >
-                      {confirmDeleteSetId === log.id ? (
-                        <div className="flex-1 flex items-center justify-between px-2">
-                          <span className="text-[10px] font-black text-red-500 uppercase tracking-widest">
-                            Delete?
-                          </span>
-                          <div className="flex gap-2">
-                            <button
-                              onClick={() => setConfirmDeleteSetId(null)}
-                              className="text-[9px] font-black text-slate-500 uppercase"
-                            >
-                              No
-                            </button>
-                            <button
-                              onClick={() => {
-                                removeSetMutation.mutate({
-                                  data: {
-                                    selectedDay,
-                                    logId: log.id,
-                                  },
-                                })
-                              }}
-                              className="text-[9px] font-black text-red-500 uppercase underline"
-                            >
-                              Yes
-                            </button>
-                          </div>
+                {filteredLogs.map((log) => (
+                  <div
+                    key={log.id}
+                    className="bg-[#232a33]/40 p-3 rounded-xl flex justify-between items-center border border-slate-700/20"
+                  >
+                    {confirmDeleteSetId === log.id ? (
+                      <div className="flex-1 flex items-center justify-between px-2">
+                        <span className="text-[10px] font-black text-red-500 uppercase tracking-widest">
+                          Delete?
+                        </span>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => setConfirmDeleteSetId(null)}
+                            className="text-[9px] font-black text-slate-500 uppercase"
+                          >
+                            No
+                          </button>
+                          <button
+                            onClick={() => {
+                              removeSetMutation.mutate({
+                                data: {
+                                  selectedDay,
+                                  logId: log.id,
+                                },
+                              })
+                            }}
+                            className="text-[9px] font-black text-red-500 uppercase underline"
+                          >
+                            Yes
+                          </button>
                         </div>
-                      ) : (
-                        <>
-                          <div className="flex flex-col">
-                            <span className="font-bold text-slate-300 text-sm">
-                              {log.exerciseName}
-                            </span>
-                            <span className="text-[9px] text-slate-500 font-bold uppercase tracking-tighter">
-                              {new Date(log.timestamp).toLocaleTimeString([], {
-                                hour: '2-digit',
-                                minute: '2-digit',
-                              })}
+                      </div>
+                    ) : (
+                      <>
+                        <div className="flex flex-col">
+                          <span className="font-bold text-slate-300 text-sm">
+                            {log.exerciseName}
+                          </span>
+                          <span className="text-[9px] text-slate-500 font-bold uppercase tracking-tighter">
+                            {new Date(log.timestamp).toLocaleTimeString([], {
+                              hour: '2-digit',
+                              minute: '2-digit',
+                            })}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <div className="bg-[#1A1F26] px-3 py-1 rounded-lg border border-slate-800 text-orange-400 font-mono text-xs font-black">
+                            {log.value}{' '}
+                            <span className="text-[8px] text-slate-600 ml-0.5">
+                              {log.type === SetType.REPS ? 'REPS' : 'SEC'}
                             </span>
                           </div>
-                          <div className="flex items-center gap-3">
-                            <div className="bg-[#1A1F26] px-3 py-1 rounded-lg border border-slate-800 text-orange-400 font-mono text-xs font-black">
-                              {log.value}{' '}
-                              <span className="text-[8px] text-slate-600 ml-0.5">
-                                {log.type === SetType.REPS ? 'REPS' : 'SEC'}
-                              </span>
-                            </div>
-                            <button
-                              onClick={() => setConfirmDeleteSetId(log.id)}
-                              className="p-1.5 text-slate-700 hover:text-red-500"
-                            >
-                              <Trash2 size={14} />
-                            </button>
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  ))}
+                          <button
+                            onClick={() => setConfirmDeleteSetId(log.id)}
+                            className="p-1.5 text-slate-700 hover:text-red-500"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                ))}
               </div>
             )}
           </div>
