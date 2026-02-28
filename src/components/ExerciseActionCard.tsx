@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type PointerEvent } from 'react'
 import {
   Plus,
   Minus,
@@ -27,9 +27,12 @@ interface Props {
   onRemove: () => void
   onRename: (newName: string) => void
   onToggleCategory: (categoryId: string) => void
+  onUpdateWeeklyGoal: (weeklySetGoal: number | null) => void
   onToggleExpand: (id: string) => void
   isExpanded: boolean
   count: number
+  weeklySetGoal: number | null
+  weekSetsDone: number
   stats: {
     week: { best: number | null; avg: number | null; worst: number | null }
     month: { best: number | null; avg: number | null; worst: number | null }
@@ -45,16 +48,113 @@ export default function ExerciseActionCard({
   onRemove,
   onRename,
   onToggleCategory,
+  onUpdateWeeklyGoal,
   onToggleExpand,
   isExpanded,
   count,
+  weeklySetGoal,
+  weekSetsDone,
   stats,
 }: Props) {
+  const repsStorageKey = useMemo(() => `workout-last-value:${id}:${SetType.REPS}`, [id])
+  const timedStorageKey = useMemo(() => `workout-last-value:${id}:${SetType.TIMED}`, [id])
+  const getInitialValue = (storageKey: string, fallback: number) => {
+    if (typeof window === 'undefined') {
+      return fallback
+    }
+    const raw = window.localStorage.getItem(storageKey)
+    if (!raw) {
+      return fallback
+    }
+    const parsed = Number(raw)
+    if (!Number.isFinite(parsed)) {
+      return fallback
+    }
+    return Math.max(1, Math.round(parsed))
+  }
+
   const [isEditing, setIsEditing] = useState(false)
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false)
   const [setType, setSetType] = useState<SetType>(SetType.REPS)
-  const [tempValue, setTempValue] = useState(10)
+  const [repsValue, setRepsValue] = useState(10)
+  const [timedValue, setTimedValue] = useState(30)
+  const [goalDraft, setGoalDraft] = useState(weeklySetGoal ?? 10)
   const [editName, setEditName] = useState(name)
+  const [storageReady, setStorageReady] = useState(false)
+  const holdTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const holdIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  const tempValue = setType === SetType.REPS ? repsValue : timedValue
+
+  const stopHold = () => {
+    if (holdTimeoutRef.current) {
+      clearTimeout(holdTimeoutRef.current)
+      holdTimeoutRef.current = null
+    }
+    if (holdIntervalRef.current) {
+      clearInterval(holdIntervalRef.current)
+      holdIntervalRef.current = null
+    }
+  }
+
+  const updateCurrentValue = (delta: number) => {
+    if (setType === SetType.REPS) {
+      setRepsValue((current) => Math.max(1, current + delta))
+      return
+    }
+    setTimedValue((current) => Math.max(1, current + delta))
+  }
+
+  const startHold = (delta: number) => {
+    updateCurrentValue(delta)
+    stopHold()
+    holdTimeoutRef.current = setTimeout(() => {
+      holdIntervalRef.current = setInterval(() => {
+        updateCurrentValue(delta)
+      }, 90)
+    }, 300)
+  }
+
+  const getHoldHandlers = (delta: number) => ({
+    onPointerDown: (e: PointerEvent<HTMLButtonElement>) => {
+      e.stopPropagation()
+      startHold(delta)
+    },
+    onPointerUp: stopHold,
+    onPointerLeave: stopHold,
+    onPointerCancel: stopHold,
+  })
+
+  useEffect(() => {
+    setRepsValue(getInitialValue(repsStorageKey, 10))
+    setTimedValue(getInitialValue(timedStorageKey, 30))
+    setStorageReady(true)
+  }, [repsStorageKey, timedStorageKey])
+
+  useEffect(() => {
+    if (!storageReady || typeof window === 'undefined') {
+      return
+    }
+    window.localStorage.setItem(repsStorageKey, String(repsValue))
+  }, [repsStorageKey, repsValue, storageReady])
+
+  useEffect(() => {
+    if (!storageReady || typeof window === 'undefined') {
+      return
+    }
+    window.localStorage.setItem(timedStorageKey, String(timedValue))
+  }, [timedStorageKey, timedValue, storageReady])
+
+  useEffect(() => () => stopHold(), [])
+
+  useEffect(() => {
+    setGoalDraft(weeklySetGoal ?? 10)
+  }, [weeklySetGoal])
+
+  const goalProgressPct =
+    weeklySetGoal && weeklySetGoal > 0
+      ? Math.min(100, Math.round((weekSetsDone / weeklySetGoal) * 100))
+      : 0
 
   return (
     <div
@@ -100,17 +200,6 @@ export default function ExerciseActionCard({
                       {count} Sets
                     </span>
                   )}
-                  {!isExpanded &&
-                    categoryIds.map((catId) => {
-                      const cat = allCategories.find((c) => c.id === catId)
-                      return cat ? (
-                        <span
-                          key={catId}
-                          className="w-1.5 h-1.5 rounded-full"
-                          style={{ backgroundColor: cat.color }}
-                        />
-                      ) : null
-                    })}
                 </div>
               </>
             )}
@@ -152,7 +241,7 @@ export default function ExerciseActionCard({
       </div>
 
       <div
-        className={`transition-all duration-300 ${isExpanded ? 'max-h-[500px] opacity-100 mt-2 pt-2 border-t border-slate-700/30' : 'max-h-0 opacity-0'}`}
+        className={`transition-all duration-300 ${isExpanded ? 'max-h-[680px] opacity-100 mt-2 pt-2 border-t border-slate-700/30' : 'max-h-0 opacity-0'}`}
       >
         {!isConfirmingDelete ? (
           <>
@@ -161,35 +250,74 @@ export default function ExerciseActionCard({
                 <div className="min-w-full snap-start pr-1">
                   <div className="mb-4">
                     <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-2">
-                      Categories
+                      Goal
                     </span>
-                    {allCategories.length === 0 ? (
-                      <p className="text-[9px] text-slate-600 italic">
-                        Create categories above to tag this exercise
-                      </p>
-                    ) : (
-                      <div className="flex flex-wrap gap-1.5">
-                        {allCategories.map((cat) => {
-                          const isSelected = categoryIds.includes(cat.id)
-                          return (
-                            <button
-                              key={cat.id}
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                onToggleCategory(cat.id)
-                              }}
-                              className={`px-2 py-1 rounded-md text-[9px] font-bold transition-all border ${
-                                isSelected
-                                  ? 'bg-slate-100 text-[#1A1F26] border-white'
-                                  : 'bg-[#1A1F26] text-slate-500 border-slate-700'
-                              }`}
-                            >
-                              {cat.name}
-                            </button>
-                          )
-                        })}
+                    <div className="bg-[#1A1F26] rounded-xl border border-slate-700 p-2.5">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="text-[9px] uppercase tracking-widest font-black text-slate-400">
+                          Sets per week
+                        </div>
+                        <div className="text-[9px] uppercase tracking-widest font-black text-orange-400">
+                          {weekSetsDone}
+                          {weeklySetGoal ? ` / ${weeklySetGoal}` : ''}
+                        </div>
                       </div>
-                    )}
+                      {weeklySetGoal ? (
+                        <div className="mt-2 h-2 rounded-full bg-slate-800 overflow-hidden">
+                          <div
+                            className="h-full bg-orange-500 transition-all"
+                            style={{ width: `${goalProgressPct}%` }}
+                          />
+                        </div>
+                      ) : (
+                        <div className="mt-2 text-[9px] text-slate-500 font-bold">
+                          No weekly goal set
+                        </div>
+                      )}
+                      <div className="mt-2 flex items-center gap-1">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setGoalDraft((value) => Math.max(1, value - 1))
+                          }}
+                          className="w-7 h-7 flex items-center justify-center bg-[#2A333E] rounded-lg text-slate-300"
+                        >
+                          <Minus size={12} />
+                        </button>
+                        <div className="w-12 text-center font-mono font-black text-white text-sm">
+                          {goalDraft}
+                        </div>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setGoalDraft((value) => value + 1)
+                          }}
+                          className="w-7 h-7 flex items-center justify-center bg-[#2A333E] rounded-lg text-slate-300"
+                        >
+                          <Plus size={12} />
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            onUpdateWeeklyGoal(goalDraft)
+                          }}
+                          className="ml-auto px-2.5 h-7 bg-orange-600 rounded-lg text-[9px] font-black uppercase tracking-widest"
+                        >
+                          Save
+                        </button>
+                        {weeklySetGoal !== null && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              onUpdateWeeklyGoal(null)
+                            }}
+                            className="px-2.5 h-7 bg-slate-700 rounded-lg text-[9px] font-black uppercase tracking-widest text-slate-300"
+                          >
+                            Clear
+                          </button>
+                        )}
+                      </div>
+                    </div>
                   </div>
 
                   <div className="flex items-center justify-between mb-2">
@@ -230,12 +358,15 @@ export default function ExerciseActionCard({
                     <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">
                       {setType === SetType.REPS ? 'Reps' : 'Seconds'}
                     </span>
-                    <div className="flex items-center bg-[#1A1F26] rounded-xl p-0.5 border border-slate-700">
+                    <div className="flex items-center gap-1 bg-[#1A1F26] rounded-xl p-0.5 border border-slate-700">
                       <button
-                        onClick={(e) => (
-                          e.stopPropagation(),
-                          setTempValue((r) => Math.max(1, r - 1))
-                        )}
+                        {...getHoldHandlers(-5)}
+                        className="w-9 h-7 flex items-center justify-center bg-[#2A333E] rounded-lg text-slate-300 text-[10px] font-black"
+                      >
+                        -5
+                      </button>
+                      <button
+                        {...getHoldHandlers(-1)}
                         className="w-7 h-7 flex items-center justify-center bg-[#2A333E] rounded-lg text-slate-300"
                       >
                         <Minus size={12} />
@@ -244,10 +375,16 @@ export default function ExerciseActionCard({
                         {tempValue}
                       </div>
                       <button
-                        onClick={(e) => (e.stopPropagation(), setTempValue((r) => r + 1))}
+                        {...getHoldHandlers(1)}
                         className="w-7 h-7 flex items-center justify-center bg-[#2A333E] rounded-lg text-slate-300"
                       >
                         <Plus size={12} />
+                      </button>
+                      <button
+                        {...getHoldHandlers(5)}
+                        className="w-9 h-7 flex items-center justify-center bg-[#2A333E] rounded-lg text-slate-300 text-[10px] font-black"
+                      >
+                        +5
                       </button>
                     </div>
                   </div>
@@ -281,6 +418,36 @@ export default function ExerciseActionCard({
 
                 <div className="min-w-full snap-start pl-1">
                   <div className="rounded-xl border border-slate-700 bg-[#1A1F26] p-3">
+                    <div className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-2">
+                      Categories
+                    </div>
+                    {allCategories.length === 0 ? (
+                      <p className="text-[9px] text-slate-600 italic mb-4">
+                        Create categories above to tag this exercise
+                      </p>
+                    ) : (
+                      <div className="flex flex-wrap gap-1.5 mb-4">
+                        {allCategories.map((cat) => {
+                          const isSelected = categoryIds.includes(cat.id)
+                          return (
+                            <button
+                              key={cat.id}
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                onToggleCategory(cat.id)
+                              }}
+                              className={`px-2 py-1 rounded-md text-[9px] font-bold transition-all border ${
+                                isSelected
+                                  ? 'bg-slate-100 text-[#1A1F26] border-white'
+                                  : 'bg-[#2A333E] text-slate-500 border-slate-700'
+                              }`}
+                            >
+                              {cat.name}
+                            </button>
+                          )
+                        })}
+                      </div>
+                    )}
                     <div className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-2">
                       Stats
                     </div>

@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { useAppSession } from '~/utils/session'
 import connectDB from './db'
 import { UserModel } from '~/models/User.model'
+import { getEnvValue } from './env'
 
 type GitHubProfile = {
   id: number | string
@@ -42,16 +43,16 @@ function generateGitHubOAuthUrl(clientId: string, redirectUri: string, state: st
 }
 
 export const initiateOAuthFn = createServerFn({ method: 'GET' })
-  .inputValidator(z.object({ provider: z.literal('github') }))
-  .handler(async () => {
-    const GITHUB_CLIENT_ID = process.env.GITHUB_CLIENT_ID!
-    const APP_URL = process.env.APP_URL!
+  .inputValidator(z.object({ provider: z.literal('github'), origin: z.string().url().optional() }))
+  .handler(async ({ data }) => {
+    const GITHUB_CLIENT_ID = getEnvValue('GITHUB_CLIENT_ID')
+    const APP_URL = data.origin || getEnvValue('APP_URL')
     const REDIRECT_URI = `${APP_URL}/auth/github/callback`
 
     const state = generateRandomState()
 
     const session = await useAppSession()
-    await session.update({ oauthState: state })
+    await session.update({ oauthState: state, oauthRedirectUri: REDIRECT_URI })
 
     const authUrl = generateGitHubOAuthUrl(GITHUB_CLIENT_ID, REDIRECT_URI, state)
 
@@ -118,6 +119,7 @@ export const githubAuthCallbackFn = createServerFn({ method: 'GET' })
   .inputValidator((data: { code: string; state: string }) => data)
   .handler(async ({ data }) => {
     const session = await useAppSession()
+    const oauthRedirectUri = session.data.oauthRedirectUri || `${getEnvValue('APP_URL')}/auth/github/callback`
 
     if (data.state !== session.data.oauthState) {
       throw new Error('Invalid state')
@@ -127,9 +129,10 @@ export const githubAuthCallbackFn = createServerFn({ method: 'GET' })
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
       body: JSON.stringify({
-        client_id: process.env.GITHUB_CLIENT_ID,
-        client_secret: process.env.GITHUB_CLIENT_SECRET,
+        client_id: getEnvValue('GITHUB_CLIENT_ID'),
+        client_secret: getEnvValue('GITHUB_CLIENT_SECRET'),
         code: data.code,
+        redirect_uri: oauthRedirectUri,
       }),
     }).then((res) => res.json())
 
@@ -158,6 +161,7 @@ export const githubAuthCallbackFn = createServerFn({ method: 'GET' })
       userId: undefined,
       email: undefined,
       oauthState: undefined,
+      oauthRedirectUri: undefined,
     })
 
     const user = await authenticateGitHubUser({
@@ -175,6 +179,7 @@ export const githubAuthCallbackFn = createServerFn({ method: 'GET' })
       userId: String(user._id),
       email: user.email || '',
       oauthState: undefined,
+      oauthRedirectUri: undefined,
     })
 
     throw redirect({ to: '/' })

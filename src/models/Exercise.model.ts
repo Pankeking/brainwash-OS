@@ -15,6 +15,11 @@ const exerciseModelSchema = new mongoose.Schema(
       required: true,
       default: [],
     },
+    weeklySetGoal: {
+      type: Number,
+      min: 1,
+      default: null,
+    },
   },
   {
     timestamps: true,

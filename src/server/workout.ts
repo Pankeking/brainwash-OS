@@ -5,7 +5,6 @@ import { useAppSession } from '~/utils/session'
 import { SetType, Weekday } from '~/enums/enums'
 import connectDB from './db'
 import { ExerciseCategoryModel } from '~/models/ExerciseCategory.model'
-import { WeekViewModel } from '~/models/WeekView.model'
 import { WorkoutLogModel } from '~/models/WorkoutLog.model'
 import { ExerciseModel } from '~/models/Exercise.model'
 
@@ -30,6 +29,11 @@ const exerciseCreateInputSchema = z.object({
 const renameExerciseInputSchema = z.object({
   exerciseId: z.string(),
   nextName: z.string().min(1).max(120),
+})
+
+const updateExerciseWeeklyGoalInputSchema = z.object({
+  exerciseId: z.string(),
+  weeklySetGoal: z.number().int().min(1).max(999).nullable(),
 })
 
 const toggleExerciseCategoryInputSchema = z.object({
@@ -295,51 +299,40 @@ export const getWorkoutDayFn = createServerFn({ method: 'POST' })
     }
     const monthRange = getMonthRangeFromDayKey(selectedDayKey)
 
-    const [categories, weekView, workoutLog, weekRangeLogs, monthRangeLogs] = await Promise.all([
-      ExerciseCategoryModel.find({ userId }).sort({ createdAt: 1 }).lean(),
-      WeekViewModel.findOne({ userId, weekday }).lean(),
-      WorkoutLogModel.findOne({
-        userId,
-        weekday,
-        date: {
-          $gte: selectedDayRange.start,
-          $lte: selectedDayRange.end,
-        },
-      }).lean(),
-      WorkoutLogModel.find({
-        userId,
-        date: {
-          $gte: weekRange.start,
-          $lte: weekRange.end,
-        },
-      }).lean(),
-      WorkoutLogModel.find({
-        userId,
-        date: {
-          $gte: monthRange.start,
-          $lte: monthRange.end,
-        },
-      }).lean(),
-    ])
+    const [categories, exerciseDocs, workoutLog, weekRangeLogs, monthRangeLogs] = await Promise.all(
+      [
+        ExerciseCategoryModel.find({ userId }).sort({ createdAt: 1 }).lean(),
+        ExerciseModel.find({ userId }).sort({ createdAt: 1 }).lean(),
+        WorkoutLogModel.findOne({
+          userId,
+          weekday,
+          date: {
+            $gte: selectedDayRange.start,
+            $lte: selectedDayRange.end,
+          },
+        }).lean(),
+        WorkoutLogModel.find({
+          userId,
+          date: {
+            $gte: weekRange.start,
+            $lte: weekRange.end,
+          },
+        }).lean(),
+        WorkoutLogModel.find({
+          userId,
+          date: {
+            $gte: monthRange.start,
+            $lte: monthRange.end,
+          },
+        }).lean(),
+      ],
+    )
 
     const normalizedCategories = categories.map((category) => ({
       id: String(category._id),
       name: category.name,
       color: category.color,
     }))
-    const exerciseIds = Array.from(
-      new Set(
-        (weekView?.exercises || []).map(
-          (exercise: { exerciseId: mongoose.Types.ObjectId | string }) =>
-            String(exercise.exerciseId),
-        ),
-      ),
-    )
-    const exerciseDocs = exerciseIds.length
-      ? await ExerciseModel.find({ _id: { $in: exerciseIds } })
-          .sort({ createdAt: 1 })
-          .lean()
-      : []
     const exerciseById = new Map(exerciseDocs.map((exercise) => [String(exercise._id), exercise]))
 
     const collectSetsByExercise = (
@@ -391,14 +384,17 @@ export const getWorkoutDayFn = createServerFn({ method: 'POST' })
 
     const exercises = exerciseDocs.map((exercise) => {
       const id = String(exercise._id)
+      const weekSetRecords = weekSetsByExercise.get(id) || []
       return {
         id,
         name: exercise.name,
         categoryIds: (exercise.categories || []).map(
           (categoryId: mongoose.Types.ObjectId | string) => String(categoryId),
         ),
+        weeklySetGoal: typeof exercise.weeklySetGoal === 'number' ? exercise.weeklySetGoal : null,
+        weekSetsDone: weekSetRecords.length,
         stats: {
-          week: getStatsFromSets(weekSetsByExercise.get(id) || []),
+          week: getStatsFromSets(weekSetRecords),
           month: getStatsFromSets(monthSetsByExercise.get(id) || []),
         },
       }
@@ -419,26 +415,33 @@ export const getWorkoutDayFn = createServerFn({ method: 'POST' })
             return []
           }
           return entry.sets
-            .map((set: { type: SetType; reps?: number; duration?: number }, setIndex: number) => {
-              const value = setToNumericValue(set)
-              if (value === null) {
-                return null
-              }
+            .map(
+              (
+                set: { type: SetType; reps?: number; duration?: number; loggedAt?: Date },
+                setIndex: number,
+              ) => {
+                const value = setToNumericValue(set)
+                if (value === null) {
+                  return null
+                }
 
-              const baseTimestamp = workoutLog?.date
-                ? new Date(workoutLog.date).getTime()
-                : Date.now()
-              const timestamp = new Date(baseTimestamp + setIndex * 1000).toISOString()
-              return {
-                id: `${exerciseIndex}:${setIndex}`,
-                exerciseId,
-                exerciseName: exercise.name,
-                type: set.type,
-                value,
-                date: selectedDayKey,
-                timestamp,
-              }
-            })
+                const fallbackTimestamp = workoutLog?.date
+                  ? new Date(workoutLog.date).getTime()
+                  : Date.now()
+                const timestamp = set.loggedAt
+                  ? new Date(set.loggedAt).toISOString()
+                  : new Date(fallbackTimestamp + setIndex * 1000).toISOString()
+                return {
+                  id: `${exerciseIndex}:${setIndex}`,
+                  exerciseId,
+                  exerciseName: exercise.name,
+                  type: set.type,
+                  value,
+                  date: selectedDayKey,
+                  timestamp,
+                }
+              },
+            )
             .filter(
               (
                 log: {
@@ -524,11 +527,9 @@ export const addWorkoutExerciseFn = createServerFn({ method: 'POST' })
   .handler(async ({ data }) => {
     await connectDB()
     const userId = await getAuthenticatedUserObjectId()
-    const selectedDayKey = parseSelectedDayKey(data.selectedDay)
-    const weekday = getWeekdayFromDayKey(selectedDayKey)
     const name = data.name.trim()
 
-    const exercise = await ExerciseModel.findOneAndUpdate(
+    await ExerciseModel.findOneAndUpdate(
       {
         userId,
         name,
@@ -546,25 +547,6 @@ export const addWorkoutExerciseFn = createServerFn({ method: 'POST' })
       },
     )
 
-    const weekView = await WeekViewModel.findOne({ userId, weekday })
-    if (!weekView) {
-      await WeekViewModel.create({
-        userId,
-        weekday,
-        exercises: [{ exerciseId: exercise._id }],
-      })
-      return { success: true }
-    }
-
-    const exists = weekView.exercises.some(
-      (row: { exerciseId: mongoose.Types.ObjectId | string }) =>
-        String(row.exerciseId) === String(exercise._id),
-    )
-    if (!exists) {
-      weekView.exercises.push({ exerciseId: exercise._id })
-      await weekView.save()
-    }
-
     return { success: true }
   })
 
@@ -573,19 +555,12 @@ export const removeWorkoutExerciseFn = createServerFn({ method: 'POST' })
   .handler(async ({ data }) => {
     await connectDB()
     const userId = await getAuthenticatedUserObjectId()
-    const selectedDayKey = parseSelectedDayKey(data.selectedDay)
-    const selectedDayRange = getUtcRangeForDayKey(selectedDayKey)
-    const weekday = getWeekdayFromDayKey(selectedDayKey)
     const exerciseId = new mongoose.Types.ObjectId(data.exerciseId)
-    await WeekViewModel.updateOne({ userId, weekday }, { $pull: { exercises: { exerciseId } } })
+
+    await ExerciseModel.deleteOne({ _id: exerciseId, userId })
     await WorkoutLogModel.updateMany(
       {
         userId,
-        weekday,
-        date: {
-          $gte: selectedDayRange.start,
-          $lte: selectedDayRange.end,
-        },
       },
       { $pull: { exercises: { 'exercise.exerciseId': exerciseId } } },
     )
@@ -612,6 +587,28 @@ export const renameWorkoutExerciseFn = createServerFn({ method: 'POST' })
     await ExerciseModel.updateOne(
       { _id: new mongoose.Types.ObjectId(data.exerciseId), userId },
       { $set: { name: nextName } },
+    )
+
+    return { success: true }
+  })
+
+export const updateWorkoutExerciseWeeklyGoalFn = createServerFn({ method: 'POST' })
+  .inputValidator(updateExerciseWeeklyGoalInputSchema)
+  .handler(async ({ data }) => {
+    await connectDB()
+    const userId = await getAuthenticatedUserObjectId()
+
+    if (data.weeklySetGoal === null) {
+      await ExerciseModel.updateOne(
+        { _id: new mongoose.Types.ObjectId(data.exerciseId), userId },
+        { $set: { weeklySetGoal: null } },
+      )
+      return { success: true }
+    }
+
+    await ExerciseModel.updateOne(
+      { _id: new mongoose.Types.ObjectId(data.exerciseId), userId },
+      { $set: { weeklySetGoal: data.weeklySetGoal } },
     )
 
     return { success: true }
@@ -691,12 +688,14 @@ export const addWorkoutSetFn = createServerFn({ method: 'POST' })
       exerciseEntry.sets.push({
         type: SetType.REPS,
         reps: data.reps,
+        loggedAt: createLogTimestampForDayKey(selectedDayKey),
       })
     }
     if (data.type === SetType.TIMED && typeof data.duration === 'number') {
       exerciseEntry.sets.push({
         type: SetType.TIMED,
         duration: data.duration,
+        loggedAt: createLogTimestampForDayKey(selectedDayKey),
       })
     }
 

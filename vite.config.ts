@@ -8,7 +8,7 @@ import { nitro } from 'nitro/vite'
 export default defineConfig({
   server: {
     port: 3000,
-    allowedHosts: ['dff7-2001-a61-108a-e801-c555-dc79-7681-e52f.ngrok-free.app'],
+    allowedHosts: ['.ngrok-free.app', 'localhost'],
   },
   plugins: [
     tailwindcss(),

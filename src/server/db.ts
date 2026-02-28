@@ -1,15 +1,13 @@
 import mongoose from 'mongoose'
 import dotenv from 'dotenv'
+import { getEnvValue } from './env'
 
 dotenv.config()
 
 export default async function connectDB() {
   try {
     if (mongoose.connection.readyState) return
-    const mongoURI = process.env.MONGO_URI
-    if (!mongoURI) {
-      throw new Error('MONGO_URI is not set')
-    }
+    const mongoURI = getEnvValue('MONGO_URI')
     await mongoose.connect(mongoURI)
     console.log('MongoDB Connected...')
   } catch (err: unknown) {

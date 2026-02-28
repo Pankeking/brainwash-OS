@@ -4,7 +4,8 @@
   "sideEffects": false,
   "type": "module",
   "scripts": {
-    "dev": "vite dev",
+    "dev": "APP_ENV=dev vite dev",
+    "dev:prod": "APP_ENV=prod vite dev",
     "build": "vite build",
     "preview": "vite preview",
     "start": "node .output/server/index.mjs",

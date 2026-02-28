@@ -4,6 +4,7 @@ import { SetType } from '../enums/enums'
 export const SetLogSchema = new mongoose.Schema(
   {
     type: { type: String, enum: Object.values(SetType), required: true },
+    loggedAt: { type: Date },
     reps: {
       type: Number,
       min: 1,

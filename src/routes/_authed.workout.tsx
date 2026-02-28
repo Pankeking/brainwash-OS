@@ -3,7 +3,7 @@ import { createFileRoute, Link } from '@tanstack/react-router'
 import { ChevronLeft, Trash2, History, PlusCircle, X, Check, Tag } from 'lucide-react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
-import { WeeklyCalendar, ExerciseActionCard, Chat } from '~/components/components'
+import { WeeklyCalendar, ExerciseActionCard, Chat, WorkoutTimers } from '~/components/components'
 import {
   addWorkoutCategoryFn,
   addWorkoutExerciseFn,
@@ -15,6 +15,7 @@ import {
   removeWorkoutSetFn,
   renameWorkoutExerciseFn,
   toggleWorkoutExerciseCategoryFn,
+  updateWorkoutExerciseWeeklyGoalFn,
   updateWorkoutCategoryColorFn,
 } from '~/server/workout'
 import { SetType } from '~/enums/enums'
@@ -29,6 +30,8 @@ export interface Exercise {
   id: string
   name: string
   categoryIds: string[]
+  weeklySetGoal: number | null
+  weekSetsDone: number
   stats: {
     week: { best: number | null; avg: number | null; worst: number | null }
     month: { best: number | null; avg: number | null; worst: number | null }
@@ -49,6 +52,8 @@ type CategoryColorOption = {
   name: string
   hex: string
 }
+
+type WorkoutTab = 'time' | 'categories' | 'exercises' | 'history'
 
 const CATEGORY_COLORS: CategoryColorOption[] = [
   { name: 'Red', hex: '#EF4444' },
@@ -111,6 +116,7 @@ function WorkoutView() {
   const [confirmDeleteSetId, setConfirmDeleteSetId] = useState<string | null>(null)
   const [expandedExerciseId, setExpandedExerciseId] = useState<string | null>(null)
   const [weeksToShow, setWeeksToShow] = useState(4)
+  const [activeTab, setActiveTab] = useState<WorkoutTab>('exercises')
 
   const invalidateWorkoutDay = () =>
     queryClient.invalidateQueries({
@@ -200,6 +206,15 @@ function WorkoutView() {
   const toggleExerciseCategoryMutation = useMutation({
     mutationFn: (input: { data: { exerciseId: string; categoryId: string } }) =>
       toggleWorkoutExerciseCategoryFn(input),
+    onSuccess: () => {
+      invalidateWorkoutDay()
+      invalidateWeeklyStats()
+    },
+  })
+
+  const updateExerciseWeeklyGoalMutation = useMutation({
+    mutationFn: (input: { data: { exerciseId: string; weeklySetGoal: number | null } }) =>
+      updateWorkoutExerciseWeeklyGoalFn(input),
     onSuccess: () => {
       invalidateWorkoutDay()
       invalidateWeeklyStats()
@@ -312,296 +327,362 @@ function WorkoutView() {
       </header>
 
       <WeeklyCalendar selectedDay={selectedDay} onSelectDay={setSelectedDay} />
+      <div className="mb-5 px-1">
+        <div className="grid grid-cols-4 gap-2 bg-[#2A333E] rounded-xl p-1 border border-slate-700">
+          <button
+            onClick={() => setActiveTab('time')}
+            className={`py-2 rounded-lg text-[9px] font-black uppercase tracking-widest ${
+              activeTab === 'time' ? 'bg-orange-500 text-white' : 'text-slate-400'
+            }`}
+          >
+            Time
+          </button>
+          <button
+            onClick={() => setActiveTab('categories')}
+            className={`py-2 rounded-lg text-[9px] font-black uppercase tracking-widest ${
+              activeTab === 'categories' ? 'bg-orange-500 text-white' : 'text-slate-400'
+            }`}
+          >
+            Categories
+          </button>
+          <button
+            onClick={() => setActiveTab('exercises')}
+            className={`py-2 rounded-lg text-[9px] font-black uppercase tracking-widest ${
+              activeTab === 'exercises' ? 'bg-orange-500 text-white' : 'text-slate-400'
+            }`}
+          >
+            Exercises
+          </button>
+          <button
+            onClick={() => setActiveTab('history')}
+            className={`py-2 rounded-lg text-[9px] font-black uppercase tracking-widest ${
+              activeTab === 'history' ? 'bg-orange-500 text-white' : 'text-slate-400'
+            }`}
+          >
+            History
+          </button>
+        </div>
+      </div>
 
       {isLoading ? (
         <div className="text-slate-400 text-center py-10 text-sm">Loading workout data...</div>
       ) : (
         <section className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-          <div className="mb-8">
-            <div className="flex justify-between items-center mb-3 px-1">
-              <h2 className="text-[10px] font-black tracking-[0.2em] text-slate-500 uppercase flex items-center gap-2">
-                <Tag size={12} className="text-orange-500" /> Categories
-              </h2>
-              <button
-                onClick={() => setIsAddingCategory(!isAddingCategory)}
-                className="text-orange-500 text-[9px] font-black uppercase tracking-widest"
-              >
-                {isAddingCategory ? 'Cancel' : '+ New Category'}
-              </button>
-            </div>
+          {activeTab === 'time' && <WorkoutTimers />}
 
-            {isAddingCategory && (
-              <div className="mb-4 animate-in zoom-in-95 duration-200">
-                <div className="bg-[#2A333E] p-2 rounded-xl border border-orange-500/30 flex items-center gap-2">
-                  <input
-                    autoFocus
-                    placeholder="e.g. Upper Body"
-                    className="bg-transparent border-none focus:ring-0 text-[16px] md:text-xs font-bold text-white flex-1"
-                    value={newCategoryName}
-                    onChange={(e) => setNewCategoryName(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleAddCategory()}
-                  />
-                  <button onClick={handleAddCategory} className="p-1.5 bg-orange-500 rounded-lg">
-                    <Check size={14} />
+          {activeTab === 'categories' && (
+            <>
+              <div className="mb-8">
+                <div className="flex justify-between items-center mb-3 px-1">
+                  <h2 className="text-[10px] font-black tracking-[0.2em] text-slate-500 uppercase flex items-center gap-2">
+                    <Tag size={12} className="text-orange-500" /> Categories
+                  </h2>
+                  <button
+                    onClick={() => setIsAddingCategory(!isAddingCategory)}
+                    className="text-orange-500 text-[9px] font-black uppercase tracking-widest"
+                  >
+                    {isAddingCategory ? 'Cancel' : '+ New Category'}
                   </button>
                 </div>
-              </div>
-            )}
 
-            {categories.length === 0 ? (
-              <div className="px-1 py-4 border border-dashed border-slate-800 rounded-xl text-center">
-                <p className="text-[8px] font-black uppercase text-slate-600 tracking-tighter">
-                  No categories created yet
-                </p>
-              </div>
-            ) : (
-              <div className="flex flex-wrap gap-2 px-1">
-                {categories.map((cat) => (
-                  <div
-                    key={cat.id}
-                    className="flex items-center gap-1.5 bg-[#2A333E] px-2 py-1 rounded-lg border border-slate-700 cursor-pointer"
-                    onClick={() => cycleCategoryColor(cat)}
-                    title={`Color: ${CATEGORY_COLORS.find((value) => value.hex === cat.color)?.name || 'Custom'}`}
-                  >
-                    <div className="w-2 h-2 rounded-full" style={{ backgroundColor: cat.color }} />
-                    <span className="text-[10px] font-bold text-slate-300">{cat.name}</span>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        removeCategoryMutation.mutate({
-                          data: {
-                            categoryId: cat.id,
-                          },
-                        })
-                      }}
-                      className="ml-1 text-slate-600 hover:text-red-500"
-                    >
-                      <X size={10} />
-                    </button>
+                {isAddingCategory && (
+                  <div className="mb-4 animate-in zoom-in-95 duration-200">
+                    <div className="bg-[#2A333E] p-2 rounded-xl border border-orange-500/30 flex items-center gap-2">
+                      <input
+                        autoFocus
+                        placeholder="e.g. Upper Body"
+                        className="bg-transparent border-none focus:ring-0 text-[16px] md:text-xs font-bold text-white flex-1"
+                        value={newCategoryName}
+                        onChange={(e) => setNewCategoryName(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && handleAddCategory()}
+                      />
+                      <button
+                        onClick={handleAddCategory}
+                        className="p-1.5 bg-orange-500 rounded-lg"
+                      >
+                        <Check size={14} />
+                      </button>
+                    </div>
                   </div>
-                ))}
-              </div>
-            )}
-          </div>
+                )}
 
-          <div className="flex justify-between items-center mb-4 px-1">
-            <h2 className="text-[10px] font-black tracking-[0.2em] text-slate-500 uppercase flex items-center gap-2">
-              <div className="w-1.5 h-1.5 bg-orange-500 rounded-full" /> Exercises
-            </h2>
-            <button
-              onClick={() => setIsAddingExercise(true)}
-              className="flex items-center gap-1.5 bg-[#2A333E] px-2.5 py-1 rounded-lg border border-slate-700 text-orange-500"
-            >
-              <PlusCircle size={12} />
-              <span className="text-[9px] font-black uppercase tracking-widest">Add New</span>
-            </button>
-          </div>
-
-          {isAddingExercise && (
-            <div className="mb-4 animate-in zoom-in-95 duration-200">
-              <div className="bg-[#2A333E] p-3 rounded-2xl border border-orange-500/30 flex items-center gap-2">
-                <input
-                  autoFocus
-                  placeholder="Exercise name..."
-                  className="bg-transparent border-none focus:ring-0 text-[16px] md:text-sm font-bold text-white flex-1"
-                  value={newExerciseName}
-                  onChange={(e) => setNewExerciseName(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleAddExercise()}
-                />
-                <button onClick={() => setIsAddingExercise(false)}>
-                  <X size={18} className="text-slate-500" />
-                </button>
-                <button onClick={handleAddExercise} className="p-1.5 bg-orange-500 rounded-lg">
-                  <Check size={18} />
-                </button>
+                {categories.length === 0 ? (
+                  <div className="px-1 py-4 border border-dashed border-slate-800 rounded-xl text-center">
+                    <p className="text-[8px] font-black uppercase text-slate-600 tracking-tighter">
+                      No categories created yet
+                    </p>
+                  </div>
+                ) : (
+                  <div className="flex flex-wrap gap-2 px-1">
+                    {categories.map((cat) => (
+                      <div
+                        key={cat.id}
+                        className="flex items-center gap-1.5 bg-[#2A333E] px-2 py-1 rounded-lg border border-slate-700 cursor-pointer"
+                        onClick={() => cycleCategoryColor(cat)}
+                        title={`Color: ${CATEGORY_COLORS.find((value) => value.hex === cat.color)?.name || 'Custom'}`}
+                      >
+                        <div
+                          className="w-2 h-2 rounded-full"
+                          style={{ backgroundColor: cat.color }}
+                        />
+                        <span className="text-[10px] font-bold text-slate-300">{cat.name}</span>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            removeCategoryMutation.mutate({
+                              data: {
+                                categoryId: cat.id,
+                              },
+                            })
+                          }}
+                          className="ml-1 text-slate-600 hover:text-red-500"
+                        >
+                          <X size={10} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
-            </div>
+
+              <div className="mt-10">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2 text-slate-600">
+                    <Tag size={12} />
+                    <h3 className="text-[10px] font-black uppercase tracking-widest">
+                      Weekly Category Sets
+                    </h3>
+                  </div>
+                  <button
+                    onClick={() => setWeeksToShow((prev) => prev + 4)}
+                    className="text-[9px] font-black uppercase tracking-widest text-orange-400"
+                  >
+                    Load More Weeks
+                  </button>
+                </div>
+
+                <div className="overflow-x-auto border border-slate-800 rounded-xl">
+                  {isWeeklyStatsLoading ? (
+                    <div className="p-4 text-[10px] text-slate-400">
+                      Loading weekly category stats...
+                    </div>
+                  ) : (
+                    <table className="min-w-full text-[10px]">
+                      <thead>
+                        <tr className="bg-[#232a33]">
+                          <th className="text-left px-3 py-2 text-slate-400 uppercase tracking-widest">
+                            Category
+                          </th>
+                          {(weeklyStatsData?.weeks || []).map((week) => (
+                            <th
+                              key={week}
+                              className="px-3 py-2 text-slate-400 uppercase tracking-widest whitespace-nowrap"
+                            >
+                              {week}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {(weeklyStatsData?.rows || []).map((row) => (
+                          <tr key={row.categoryId} className="border-t border-slate-800">
+                            <td className="px-3 py-2 whitespace-nowrap">
+                              <div className="flex items-center gap-2">
+                                <span
+                                  className="inline-block w-2 h-2 rounded-full"
+                                  style={{ backgroundColor: row.color }}
+                                />
+                                <span className="text-slate-200 font-bold">{row.name}</span>
+                              </div>
+                            </td>
+                            {row.counts.map((count, index) => (
+                              <td
+                                key={`${row.categoryId}-${index}`}
+                                className="px-3 py-2 text-center text-slate-300"
+                              >
+                                {count}
+                              </td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+              </div>
+            </>
           )}
 
-          <div className="grid grid-cols-1 gap-3">
-            {myExercises.length === 0 && !isAddingExercise && (
-              <div className="text-center py-12 border-2 border-dashed border-slate-800 rounded-3xl">
-                <p className="text-[10px] font-black uppercase text-slate-600 tracking-widest">
-                  Your exercise bank is empty
-                </p>
+          {activeTab === 'exercises' && (
+            <>
+              <div className="flex justify-between items-center mb-4 px-1">
+                <h2 className="text-[10px] font-black tracking-[0.2em] text-slate-500 uppercase flex items-center gap-2">
+                  <div className="w-1.5 h-1.5 bg-orange-500 rounded-full" /> Exercises
+                </h2>
+                <button
+                  onClick={() => setIsAddingExercise(true)}
+                  className="flex items-center gap-1.5 bg-[#2A333E] px-2.5 py-1 rounded-lg border border-slate-700 text-orange-500"
+                >
+                  <PlusCircle size={12} />
+                  <span className="text-[9px] font-black uppercase tracking-widest">Add New</span>
+                </button>
               </div>
-            )}
-            {myExercises.map((ex) => (
-              <ExerciseActionCard
-                key={ex.id}
-                id={ex.id}
-                name={ex.name}
-                categoryIds={ex.categoryIds}
-                allCategories={categories}
-                onAdd={(payload) => addSet(ex, payload)}
-                onRemove={() => removeExercise(ex.id)}
-                onRename={(newName) =>
-                  renameExerciseMutation.mutate({
-                    data: {
-                      exerciseId: ex.id,
-                      nextName: newName,
-                    },
-                  })
-                }
-                onToggleCategory={(catId) =>
-                  toggleExerciseCategoryMutation.mutate({
-                    data: {
-                      exerciseId: ex.id,
-                      categoryId: catId,
-                    },
-                  })
-                }
-                onToggleExpand={(id) => setExpandedExerciseId((prev) => (prev === id ? null : id))}
-                isExpanded={expandedExerciseId === ex.id}
-                count={logCountByExercise.get(ex.id) || 0}
-                stats={ex.stats}
-              />
-            ))}
-          </div>
 
-          <div className="mt-10">
-            <div className="flex items-center gap-2 mb-4 text-slate-600">
-              <History size={12} />
-              <h3 className="text-[10px] font-black uppercase tracking-widest">History</h3>
-            </div>
-            {filteredLogs.length === 0 ? (
-              <div className="border border-dashed border-slate-800 rounded-xl p-4 text-center text-[10px] text-slate-500 uppercase font-black tracking-widest">
-                No logs for selected day
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {filteredLogs.map((log) => (
-                  <div
-                    key={log.id}
-                    className="bg-[#232a33]/40 p-3 rounded-xl flex justify-between items-center border border-slate-700/20"
-                  >
-                    {confirmDeleteSetId === log.id ? (
-                      <div className="flex-1 flex items-center justify-between px-2">
-                        <span className="text-[10px] font-black text-red-500 uppercase tracking-widest">
-                          Delete?
-                        </span>
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => setConfirmDeleteSetId(null)}
-                            className="text-[9px] font-black text-slate-500 uppercase"
-                          >
-                            No
-                          </button>
-                          <button
-                            onClick={() => {
-                              removeSetMutation.mutate({
-                                data: {
-                                  selectedDay,
-                                  logId: log.id,
-                                },
-                              })
-                            }}
-                            className="text-[9px] font-black text-red-500 uppercase underline"
-                          >
-                            Yes
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <>
-                        <div className="flex flex-col">
-                          <span className="font-bold text-slate-300 text-sm">
-                            {log.exerciseName}
-                          </span>
-                          <span className="text-[9px] text-slate-500 font-bold uppercase tracking-tighter">
-                            {new Date(log.timestamp).toLocaleTimeString([], {
-                              hour: '2-digit',
-                              minute: '2-digit',
-                            })}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <div className="bg-[#1A1F26] px-3 py-1 rounded-lg border border-slate-800 text-orange-400 font-mono text-xs font-black">
-                            {log.value}{' '}
-                            <span className="text-[8px] text-slate-600 ml-0.5">
-                              {log.type === SetType.REPS ? 'REPS' : 'SEC'}
-                            </span>
-                          </div>
-                          <button
-                            onClick={() => setConfirmDeleteSetId(log.id)}
-                            className="p-1.5 text-slate-700 hover:text-red-500"
-                          >
-                            <Trash2 size={14} />
-                          </button>
-                        </div>
-                      </>
-                    )}
+              {isAddingExercise && (
+                <div className="mb-4 animate-in zoom-in-95 duration-200">
+                  <div className="bg-[#2A333E] p-3 rounded-2xl border border-orange-500/30 flex items-center gap-2">
+                    <input
+                      autoFocus
+                      placeholder="Exercise name..."
+                      className="bg-transparent border-none focus:ring-0 text-[16px] md:text-sm font-bold text-white flex-1"
+                      value={newExerciseName}
+                      onChange={(e) => setNewExerciseName(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && handleAddExercise()}
+                    />
+                    <button onClick={() => setIsAddingExercise(false)}>
+                      <X size={18} className="text-slate-500" />
+                    </button>
+                    <button onClick={handleAddExercise} className="p-1.5 bg-orange-500 rounded-lg">
+                      <Check size={18} />
+                    </button>
                   </div>
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 gap-3">
+                {myExercises.length === 0 && !isAddingExercise && (
+                  <div className="text-center py-12 border-2 border-dashed border-slate-800 rounded-3xl">
+                    <p className="text-[10px] font-black uppercase text-slate-600 tracking-widest">
+                      Your exercise bank is empty
+                    </p>
+                  </div>
+                )}
+                {myExercises.map((ex) => (
+                  <ExerciseActionCard
+                    key={ex.id}
+                    id={ex.id}
+                    name={ex.name}
+                    categoryIds={ex.categoryIds}
+                    allCategories={categories}
+                    onAdd={(payload) => addSet(ex, payload)}
+                    onRemove={() => removeExercise(ex.id)}
+                    onRename={(newName) =>
+                      renameExerciseMutation.mutate({
+                        data: {
+                          exerciseId: ex.id,
+                          nextName: newName,
+                        },
+                      })
+                    }
+                    onToggleCategory={(catId) =>
+                      toggleExerciseCategoryMutation.mutate({
+                        data: {
+                          exerciseId: ex.id,
+                          categoryId: catId,
+                        },
+                      })
+                    }
+                    onUpdateWeeklyGoal={(weeklySetGoal) =>
+                      updateExerciseWeeklyGoalMutation.mutate({
+                        data: {
+                          exerciseId: ex.id,
+                          weeklySetGoal,
+                        },
+                      })
+                    }
+                    onToggleExpand={(id) =>
+                      setExpandedExerciseId((prev) => (prev === id ? null : id))
+                    }
+                    isExpanded={expandedExerciseId === ex.id}
+                    count={logCountByExercise.get(ex.id) || 0}
+                    weeklySetGoal={ex.weeklySetGoal}
+                    weekSetsDone={ex.weekSetsDone}
+                    stats={ex.stats}
+                  />
                 ))}
               </div>
-            )}
-          </div>
+            </>
+          )}
 
-          <div className="mt-10">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2 text-slate-600">
-                <Tag size={12} />
-                <h3 className="text-[10px] font-black uppercase tracking-widest">
-                  Weekly Category Sets
-                </h3>
+          {activeTab === 'history' && (
+            <div>
+              <div className="flex items-center gap-2 mb-4 text-slate-600">
+                <History size={12} />
+                <h3 className="text-[10px] font-black uppercase tracking-widest">History</h3>
               </div>
-              <button
-                onClick={() => setWeeksToShow((prev) => prev + 4)}
-                className="text-[9px] font-black uppercase tracking-widest text-orange-400"
-              >
-                Load More Weeks
-              </button>
-            </div>
-
-            <div className="overflow-x-auto border border-slate-800 rounded-xl">
-              {isWeeklyStatsLoading ? (
-                <div className="p-4 text-[10px] text-slate-400">
-                  Loading weekly category stats...
+              {filteredLogs.length === 0 ? (
+                <div className="border border-dashed border-slate-800 rounded-xl p-4 text-center text-[10px] text-slate-500 uppercase font-black tracking-widest">
+                  No logs for selected day
                 </div>
               ) : (
-                <table className="min-w-full text-[10px]">
-                  <thead>
-                    <tr className="bg-[#232a33]">
-                      <th className="text-left px-3 py-2 text-slate-400 uppercase tracking-widest">
-                        Category
-                      </th>
-                      {(weeklyStatsData?.weeks || []).map((week) => (
-                        <th
-                          key={week}
-                          className="px-3 py-2 text-slate-400 uppercase tracking-widest whitespace-nowrap"
-                        >
-                          {week}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {(weeklyStatsData?.rows || []).map((row) => (
-                      <tr key={row.categoryId} className="border-t border-slate-800">
-                        <td className="px-3 py-2 whitespace-nowrap">
-                          <div className="flex items-center gap-2">
-                            <span
-                              className="inline-block w-2 h-2 rounded-full"
-                              style={{ backgroundColor: row.color }}
-                            />
-                            <span className="text-slate-200 font-bold">{row.name}</span>
+                <div className="space-y-2">
+                  {filteredLogs.map((log) => (
+                    <div
+                      key={log.id}
+                      className="bg-[#232a33]/40 p-3 rounded-xl flex justify-between items-center border border-slate-700/20"
+                    >
+                      {confirmDeleteSetId === log.id ? (
+                        <div className="flex-1 flex items-center justify-between px-2">
+                          <span className="text-[10px] font-black text-red-500 uppercase tracking-widest">
+                            Delete?
+                          </span>
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => setConfirmDeleteSetId(null)}
+                              className="text-[9px] font-black text-slate-500 uppercase"
+                            >
+                              No
+                            </button>
+                            <button
+                              onClick={() => {
+                                removeSetMutation.mutate({
+                                  data: {
+                                    selectedDay,
+                                    logId: log.id,
+                                  },
+                                })
+                              }}
+                              className="text-[9px] font-black text-red-500 uppercase underline"
+                            >
+                              Yes
+                            </button>
                           </div>
-                        </td>
-                        {row.counts.map((count, index) => (
-                          <td
-                            key={`${row.categoryId}-${index}`}
-                            className="px-3 py-2 text-center text-slate-300"
-                          >
-                            {count}
-                          </td>
-                        ))}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                        </div>
+                      ) : (
+                        <>
+                          <div className="flex flex-col">
+                            <span className="font-bold text-slate-300 text-sm">
+                              {log.exerciseName}
+                            </span>
+                            <span className="text-[9px] text-slate-500 font-bold uppercase tracking-tighter">
+                              {new Date(log.timestamp).toLocaleTimeString([], {
+                                hour: '2-digit',
+                                minute: '2-digit',
+                              })}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <div className="bg-[#1A1F26] px-3 py-1 rounded-lg border border-slate-800 text-orange-400 font-mono text-xs font-black">
+                              {log.value}{' '}
+                              <span className="text-[8px] text-slate-600 ml-0.5">
+                                {log.type === SetType.REPS ? 'REPS' : 'SEC'}
+                              </span>
+                            </div>
+                            <button
+                              onClick={() => setConfirmDeleteSetId(log.id)}
+                              className="p-1.5 text-slate-700 hover:text-red-500"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  ))}
+                </div>
               )}
             </div>
-          </div>
+          )}
         </section>
       )}
 
