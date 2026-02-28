@@ -61,6 +61,30 @@ function getGoogleLiveVoiceModel() {
   return getOptionalEnvValue('GOOGLE_VOICE_LIVE_MODEL') || 'gemini-2.5-flash-native-audio-latest'
 }
 
+function getGoogleLiveTimeoutMs() {
+  const rawValue = getOptionalEnvValue('GOOGLE_VOICE_LIVE_TIMEOUT_MS')
+  if (!rawValue) {
+    return 4_000
+  }
+  const parsed = Number.parseInt(rawValue, 10)
+  if (!Number.isFinite(parsed) || parsed < 500) {
+    return 4_000
+  }
+  return parsed
+}
+
+function getGoogleLiveMaxAttempts() {
+  const rawValue = getOptionalEnvValue('GOOGLE_VOICE_LIVE_MAX_ATTEMPTS')
+  if (!rawValue) {
+    return 1
+  }
+  const parsed = Number.parseInt(rawValue, 10)
+  if (!Number.isFinite(parsed) || parsed < 1) {
+    return 1
+  }
+  return parsed
+}
+
 function getOrderedGoogleLiveModels() {
   const envOverride = getOptionalEnvValue('GOOGLE_VOICE_LIVE_MODELS')
   const configuredModels = envOverride
@@ -72,11 +96,7 @@ function getOrderedGoogleLiveModels() {
   if (configuredModels.length > 0) {
     return configuredModels
   }
-  return [
-    getGoogleLiveVoiceModel(),
-    'gemini-2.5-flash-native-audio-preview-12-2025',
-    'gemini-2.5-flash-native-audio-preview-09-2025',
-  ]
+  return [getGoogleLiveVoiceModel()]
 }
 
 function getOrderedGoogleTranscriptionModels() {
@@ -141,6 +161,7 @@ async function transcribeWithGoogleLive(
   mimeType: string,
   apiKey: string,
   model: string,
+  timeoutMs: number,
 ) {
   if (typeof WebSocket === 'undefined') {
     throw new Error('WebSocket is not available in this server runtime')
@@ -207,7 +228,7 @@ async function transcribeWithGoogleLive(
         return
       }
       finalizeFailure(new Error('Live API transcription timed out'))
-    }, 12_000)
+    }, timeoutMs)
 
     websocket.addEventListener('open', () => {
       appLogInfo('BW_VOICE_LIVE_SOCKET_OPEN', 'Live websocket opened', {
@@ -219,18 +240,10 @@ async function transcribeWithGoogleLive(
           setup: {
             model: `models/${model}`,
             generationConfig: {
-              responseModalities: ['AUDIO'],
-              speechConfig: {
-                voiceConfig: {
-                  prebuiltVoiceConfig: {
-                    voiceName: 'Aoede',
-                  },
-                },
-              },
+              responseModalities: ['TEXT'],
               temperature: 0,
             },
             inputAudioTranscription: {},
-            outputAudioTranscription: {},
           },
         }),
       )
@@ -259,31 +272,18 @@ async function transcribeWithGoogleLive(
           provider: 'google',
           model,
         })
-        if (mimeType.toLowerCase().startsWith('audio/pcm')) {
-          websocket.send(
-            JSON.stringify({
-              realtimeInput: {
-                audio: {
+        websocket.send(
+          JSON.stringify({
+            realtimeInput: {
+              mediaChunks: [
+                {
                   mimeType,
                   data: audioBase64,
                 },
-              },
-            }),
-          )
-        } else {
-          websocket.send(
-            JSON.stringify({
-              realtimeInput: {
-                mediaChunks: [
-                  {
-                    mimeType,
-                    data: audioBase64,
-                  },
-                ],
-              },
-            }),
-          )
-        }
+              ],
+            },
+          }),
+        )
         websocket.send(
           JSON.stringify({
             realtimeInput: {
@@ -484,13 +484,16 @@ async function transcribeWithGoogle(payload: {
     const liveAudioBase64 = payload.liveAudioBase64 || payload.audioBase64
     const liveMimeType = payload.liveMimeType || payload.mimeType
     const orderedLiveModels = getOrderedGoogleLiveModels()
-    for (const liveModel of orderedLiveModels) {
+    const timeoutMs = getGoogleLiveTimeoutMs()
+    const maxAttempts = getGoogleLiveMaxAttempts()
+    for (const liveModel of orderedLiveModels.slice(0, maxAttempts)) {
       try {
         const transcript = await transcribeWithGoogleLive(
           liveAudioBase64,
           liveMimeType,
           apiKey,
           liveModel,
+          timeoutMs,
         )
         if (transcript.trim()) {
           appLogInfo('BW_VOICE_LIVE_MODEL_SUCCESS', 'Live API transcription succeeded', {
