@@ -58,45 +58,66 @@ function shouldUseGoogleLiveVoice() {
 }
 
 function getGoogleLiveVoiceModel() {
-  return getOptionalEnvValue('GOOGLE_VOICE_LIVE_MODEL') || 'gemini-2.5-flash-native-audio-latest'
+  return 'gemini-2.5-flash-native-audio-latest'
 }
 
-function getGoogleLiveTimeoutMs() {
-  const rawValue = getOptionalEnvValue('GOOGLE_VOICE_LIVE_TIMEOUT_MS')
-  if (!rawValue) {
-    return 4_000
+function getPcmSampleRateFromMimeType(mimeType: string) {
+  const match = mimeType.toLowerCase().match(/rate\s*=\s*(\d{4,6})/)
+  const parsedRate = Number.parseInt(match?.[1] || '', 10)
+  if (!Number.isFinite(parsedRate) || parsedRate < 8000) {
+    return 16_000
   }
-  const parsed = Number.parseInt(rawValue, 10)
-  if (!Number.isFinite(parsed) || parsed < 500) {
-    return 4_000
-  }
-  return parsed
+  return parsedRate
 }
 
-function getGoogleLiveMaxAttempts() {
-  const rawValue = getOptionalEnvValue('GOOGLE_VOICE_LIVE_MAX_ATTEMPTS')
-  if (!rawValue) {
-    return 1
+function estimateAudioDurationMs(audioBase64: string, mimeType: string) {
+  const normalizedMime = mimeType.toLowerCase()
+  if (!normalizedMime.startsWith('audio/pcm')) {
+    return 0
   }
-  const parsed = Number.parseInt(rawValue, 10)
-  if (!Number.isFinite(parsed) || parsed < 1) {
-    return 1
+  const sampleRate = getPcmSampleRateFromMimeType(normalizedMime)
+  const paddingLength = audioBase64.endsWith('==') ? 2 : audioBase64.endsWith('=') ? 1 : 0
+  const byteLength = Math.floor((audioBase64.length * 3) / 4) - paddingLength
+  if (byteLength <= 0) {
+    return 0
   }
-  return parsed
+  const durationMs = Math.floor((byteLength / (sampleRate * 2)) * 1000)
+  return durationMs > 0 ? durationMs : 0
+}
+
+function getGoogleLiveTimeoutMs(audioBase64: string, mimeType: string) {
+  const durationMs = estimateAudioDurationMs(audioBase64, mimeType)
+  if (durationMs <= 0) {
+    return 12_000
+  }
+  const timeoutMs = Math.ceil(durationMs * 1.5) + 6_000
+  if (timeoutMs < 8_000) {
+    return 8_000
+  }
+  if (timeoutMs > 45_000) {
+    return 45_000
+  }
+  return timeoutMs
+}
+
+function splitBase64IntoChunks(audioBase64: string, chunkSize = 24_000) {
+  const normalizedChunkSize = Math.max(4, chunkSize - (chunkSize % 4))
+  const chunks: string[] = []
+  let start = 0
+  while (start < audioBase64.length) {
+    const end = Math.min(audioBase64.length, start + normalizedChunkSize)
+    chunks.push(audioBase64.slice(start, end))
+    start = end
+  }
+  return chunks
 }
 
 function getOrderedGoogleLiveModels() {
-  const envOverride = getOptionalEnvValue('GOOGLE_VOICE_LIVE_MODELS')
-  const configuredModels = envOverride
-    ? envOverride
-        .split(',')
-        .map((value) => value.trim())
-        .filter(Boolean)
-    : []
-  if (configuredModels.length > 0) {
-    return configuredModels
-  }
-  return [getGoogleLiveVoiceModel()]
+  return [
+    getGoogleLiveVoiceModel(),
+    'gemini-2.5-flash-native-audio-preview-12-2025',
+    'gemini-2.5-flash-native-audio-preview-09-2025',
+  ]
 }
 
 function getOrderedGoogleTranscriptionModels() {
@@ -161,7 +182,6 @@ async function transcribeWithGoogleLive(
   mimeType: string,
   apiKey: string,
   model: string,
-  timeoutMs: number,
 ) {
   if (typeof WebSocket === 'undefined') {
     throw new Error('WebSocket is not available in this server runtime')
@@ -222,6 +242,7 @@ async function transcribeWithGoogleLive(
       reject(error)
     }
 
+    const timeoutMs = getGoogleLiveTimeoutMs(audioBase64, mimeType)
     const timeout = setTimeout(() => {
       if (transcript.trim()) {
         finalizeSuccess(transcript.trim())
@@ -272,18 +293,29 @@ async function transcribeWithGoogleLive(
           provider: 'google',
           model,
         })
-        websocket.send(
-          JSON.stringify({
-            realtimeInput: {
-              mediaChunks: [
-                {
-                  mimeType,
-                  data: audioBase64,
-                },
-              ],
-            },
-          }),
-        )
+        const mediaChunks = splitBase64IntoChunks(audioBase64)
+        mediaChunks.forEach((chunk) => {
+          websocket.send(
+            JSON.stringify({
+              realtimeInput: {
+                mediaChunks: [
+                  {
+                    mimeType,
+                    data: chunk,
+                  },
+                ],
+              },
+            }),
+          )
+        })
+        appLogInfo('BW_VOICE_LIVE_AUDIO_SENT', 'Sent live audio payload', {
+          provider: 'google',
+          model,
+          mimeType,
+          chunkCount: mediaChunks.length,
+          timeoutMs,
+          estimatedDurationMs: estimateAudioDurationMs(audioBase64, mimeType),
+        })
         websocket.send(
           JSON.stringify({
             realtimeInput: {
@@ -484,17 +516,9 @@ async function transcribeWithGoogle(payload: {
     const liveAudioBase64 = payload.liveAudioBase64 || payload.audioBase64
     const liveMimeType = payload.liveMimeType || payload.mimeType
     const orderedLiveModels = getOrderedGoogleLiveModels()
-    const timeoutMs = getGoogleLiveTimeoutMs()
-    const maxAttempts = getGoogleLiveMaxAttempts()
-    for (const liveModel of orderedLiveModels.slice(0, maxAttempts)) {
+    for (const liveModel of orderedLiveModels) {
       try {
-        const transcript = await transcribeWithGoogleLive(
-          liveAudioBase64,
-          liveMimeType,
-          apiKey,
-          liveModel,
-          timeoutMs,
-        )
+        const transcript = await transcribeWithGoogleLive(liveAudioBase64, liveMimeType, apiKey, liveModel)
         if (transcript.trim()) {
           appLogInfo('BW_VOICE_LIVE_MODEL_SUCCESS', 'Live API transcription succeeded', {
             provider: 'google',

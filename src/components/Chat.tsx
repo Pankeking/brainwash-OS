@@ -53,6 +53,15 @@ function float32ToInt16(input: Float32Array) {
   return output
 }
 
+function int16ToLittleEndianBytes(input: Int16Array) {
+  const bytes = new Uint8Array(input.length * 2)
+  const view = new DataView(bytes.buffer)
+  for (let index = 0; index < input.length; index += 1) {
+    view.setInt16(index * 2, input[index] || 0, true)
+  }
+  return bytes
+}
+
 function toBase64FromBytes(bytes: Uint8Array) {
   let binary = ''
   const chunkSize = 0x8000
@@ -84,7 +93,7 @@ function convertAudioBufferToPcm16k(audioBuffer: AudioBuffer) {
     offsetResult += 1
   }
   const pcmInt16 = float32ToInt16(resampled)
-  return new Uint8Array(pcmInt16.buffer)
+  return int16ToLittleEndianBytes(pcmInt16)
 }
 
 async function convertBlobToPcmBase64(blob: Blob) {
@@ -595,7 +604,7 @@ export default function Chat({ context, onWorkoutDataChanged }: ChatProps) {
           let liveMimeType: string | undefined
           try {
             liveAudioBase64 = await convertBlobToPcmBase64(blob)
-            liveMimeType = 'audio/pcm'
+            liveMimeType = 'audio/pcm;rate=16000'
             pushClientLog('BW_VOICE_PCM_READY', 'info', 'PCM audio prepared for live route', {
               pcmLength: liveAudioBase64.length,
             })
