@@ -219,10 +219,18 @@ async function transcribeWithGoogleLive(
           setup: {
             model: `models/${model}`,
             generationConfig: {
-              responseModalities: ['TEXT'],
+              responseModalities: ['AUDIO'],
+              speechConfig: {
+                voiceConfig: {
+                  prebuiltVoiceConfig: {
+                    voiceName: 'Aoede',
+                  },
+                },
+              },
               temperature: 0,
             },
             inputAudioTranscription: {},
+            outputAudioTranscription: {},
           },
         }),
       )
@@ -283,23 +291,6 @@ async function transcribeWithGoogleLive(
             },
           }),
         )
-        websocket.send(
-          JSON.stringify({
-            clientContent: {
-              turns: [
-                {
-                  role: 'user',
-                  parts: [
-                    {
-                      text: 'Return strict JSON only: {"transcript":"<exact spoken words>"}',
-                    },
-                  ],
-                },
-              ],
-              turnComplete: true,
-            },
-          }),
-        )
         return
       }
 
@@ -331,7 +322,10 @@ async function transcribeWithGoogleLive(
         parsed.server_content?.turn_complete === true ||
         parsed.turnComplete === true ||
         parsed.turn_complete === true
-      if (turnComplete && transcript.trim()) {
+      const inputFinished =
+        parsed.serverContent?.inputTranscription?.finished === true ||
+        parsed.server_content?.input_transcription?.finished === true
+      if ((inputFinished || turnComplete) && transcript.trim()) {
         clearTimeout(timeout)
         finalizeSuccess(transcript.trim())
       }
