@@ -23,6 +23,20 @@ export function getEnvValue(key: string): string {
   throw new Error(`${key} is not set`)
 }
 
+export function getOptionalEnvValue(key: string): string | undefined {
+  const scopedValue = process.env[`${key}_${getEnvironmentSuffix()}`]
+  if (scopedValue) {
+    return scopedValue
+  }
+
+  const fallbackValue = process.env[key]
+  if (fallbackValue) {
+    return fallbackValue
+  }
+
+  return undefined
+}
+
 export function isProductionEnvironment() {
   return getAppEnvironment() === 'prod'
 }

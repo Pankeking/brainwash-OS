@@ -151,10 +151,10 @@ export default function ExerciseActionCard({
     setGoalDraft(weeklySetGoal ?? 10)
   }, [weeklySetGoal])
 
-  const goalProgressPct =
-    weeklySetGoal && weeklySetGoal > 0
-      ? Math.min(100, Math.round((weekSetsDone / weeklySetGoal) * 100))
-      : 0
+  const hasWeeklyGoal = weeklySetGoal !== null && weeklySetGoal > 0
+  const goalProgressPct = hasWeeklyGoal
+    ? Math.min(100, Math.round((weekSetsDone / weeklySetGoal) * 100))
+    : 0
 
   return (
     <div
@@ -200,6 +200,17 @@ export default function ExerciseActionCard({
                       {count} Sets
                     </span>
                   )}
+                  {!isExpanded &&
+                    categoryIds.map((catId) => {
+                      const cat = allCategories.find((c) => c.id === catId)
+                      return cat ? (
+                        <span
+                          key={catId}
+                          className="w-1.5 h-1.5 rounded-full"
+                          style={{ backgroundColor: cat.color }}
+                        />
+                      ) : null
+                    })}
                 </div>
               </>
             )}
@@ -259,10 +270,10 @@ export default function ExerciseActionCard({
                         </div>
                         <div className="text-[9px] uppercase tracking-widest font-black text-orange-400">
                           {weekSetsDone}
-                          {weeklySetGoal ? ` / ${weeklySetGoal}` : ''}
+                          {hasWeeklyGoal ? ` / ${weeklySetGoal}` : ''}
                         </div>
                       </div>
-                      {weeklySetGoal ? (
+                      {hasWeeklyGoal ? (
                         <div className="mt-2 h-2 rounded-full bg-slate-800 overflow-hidden">
                           <div
                             className="h-full bg-orange-500 transition-all"

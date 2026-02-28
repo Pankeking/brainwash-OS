@@ -1,6 +1,16 @@
 import { useMemo, useState } from 'react'
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { ChevronLeft, Trash2, History, PlusCircle, X, Check, Tag } from 'lucide-react'
+import {
+  ChevronLeft,
+  Trash2,
+  History,
+  PlusCircle,
+  X,
+  Check,
+  Tag,
+  Clock3,
+  Dumbbell,
+} from 'lucide-react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { WeeklyCalendar, ExerciseActionCard, Chat, WorkoutTimers } from '~/components/components'
@@ -118,10 +128,15 @@ function WorkoutView() {
   const [weeksToShow, setWeeksToShow] = useState(4)
   const [activeTab, setActiveTab] = useState<WorkoutTab>('exercises')
 
-  const invalidateWorkoutDay = () =>
-    queryClient.invalidateQueries({
-      queryKey: ['workout-day', selectedDay],
+  const refreshWorkoutDay = async (dayKey: string) => {
+    await queryClient.invalidateQueries({
+      queryKey: ['workout-day', dayKey],
     })
+    await queryClient.refetchQueries({
+      queryKey: ['workout-day', dayKey],
+      type: 'all',
+    })
+  }
 
   const invalidateWeeklyStats = () =>
     queryClient.invalidateQueries({
@@ -150,17 +165,17 @@ function WorkoutView() {
 
   const addCategoryMutation = useMutation({
     mutationFn: (input: { data: { name: string; color: string } }) => addWorkoutCategoryFn(input),
-    onSuccess: () => {
+    onSuccess: async () => {
       setNewCategoryName('')
       setIsAddingCategory(false)
-      invalidateWorkoutDay()
+      await refreshWorkoutDay(selectedDay)
     },
   })
 
   const removeCategoryMutation = useMutation({
     mutationFn: (input: { data: { categoryId: string } }) => removeWorkoutCategoryFn(input),
-    onSuccess: () => {
-      invalidateWorkoutDay()
+    onSuccess: async () => {
+      await refreshWorkoutDay(selectedDay)
       invalidateWeeklyStats()
     },
   })
@@ -168,8 +183,8 @@ function WorkoutView() {
   const updateCategoryColorMutation = useMutation({
     mutationFn: (input: { data: { categoryId: string; color: string } }) =>
       updateWorkoutCategoryColorFn(input),
-    onSuccess: () => {
-      invalidateWorkoutDay()
+    onSuccess: async () => {
+      await refreshWorkoutDay(selectedDay)
       invalidateWeeklyStats()
     },
   })
@@ -177,10 +192,10 @@ function WorkoutView() {
   const addExerciseMutation = useMutation({
     mutationFn: (input: { data: { selectedDay: string; name: string } }) =>
       addWorkoutExerciseFn(input),
-    onSuccess: () => {
+    onSuccess: async () => {
       setNewExerciseName('')
       setIsAddingExercise(false)
-      invalidateWorkoutDay()
+      await refreshWorkoutDay(selectedDay)
       invalidateWeeklyStats()
     },
   })
@@ -188,8 +203,8 @@ function WorkoutView() {
   const removeExerciseMutation = useMutation({
     mutationFn: (input: { data: { selectedDay: string; exerciseId: string } }) =>
       removeWorkoutExerciseFn(input),
-    onSuccess: () => {
-      invalidateWorkoutDay()
+    onSuccess: async () => {
+      await refreshWorkoutDay(selectedDay)
       invalidateWeeklyStats()
     },
   })
@@ -197,8 +212,8 @@ function WorkoutView() {
   const renameExerciseMutation = useMutation({
     mutationFn: (input: { data: { exerciseId: string; nextName: string } }) =>
       renameWorkoutExerciseFn(input),
-    onSuccess: () => {
-      invalidateWorkoutDay()
+    onSuccess: async () => {
+      await refreshWorkoutDay(selectedDay)
       invalidateWeeklyStats()
     },
   })
@@ -206,8 +221,8 @@ function WorkoutView() {
   const toggleExerciseCategoryMutation = useMutation({
     mutationFn: (input: { data: { exerciseId: string; categoryId: string } }) =>
       toggleWorkoutExerciseCategoryFn(input),
-    onSuccess: () => {
-      invalidateWorkoutDay()
+    onSuccess: async () => {
+      await refreshWorkoutDay(selectedDay)
       invalidateWeeklyStats()
     },
   })
@@ -215,8 +230,8 @@ function WorkoutView() {
   const updateExerciseWeeklyGoalMutation = useMutation({
     mutationFn: (input: { data: { exerciseId: string; weeklySetGoal: number | null } }) =>
       updateWorkoutExerciseWeeklyGoalFn(input),
-    onSuccess: () => {
-      invalidateWorkoutDay()
+    onSuccess: async () => {
+      await refreshWorkoutDay(selectedDay)
       invalidateWeeklyStats()
     },
   })
@@ -231,8 +246,8 @@ function WorkoutView() {
         duration?: number
       }
     }) => addWorkoutSetFn(input),
-    onSuccess: () => {
-      invalidateWorkoutDay()
+    onSuccess: async () => {
+      await refreshWorkoutDay(selectedDay)
       invalidateWeeklyStats()
     },
   })
@@ -240,9 +255,9 @@ function WorkoutView() {
   const removeSetMutation = useMutation({
     mutationFn: (input: { data: { selectedDay: string; logId: string } }) =>
       removeWorkoutSetFn(input),
-    onSuccess: () => {
+    onSuccess: async () => {
       setConfirmDeleteSetId(null)
-      invalidateWorkoutDay()
+      await refreshWorkoutDay(selectedDay)
       invalidateWeeklyStats()
     },
   })
@@ -306,6 +321,12 @@ function WorkoutView() {
     })
   }
 
+  const handleAssistantWorkoutChanged = (nextSelectedDay: string) => {
+    setSelectedDay(nextSelectedDay)
+    void refreshWorkoutDay(nextSelectedDay)
+    invalidateWeeklyStats()
+  }
+
   const filteredLogs = useMemo(() => logs.slice().reverse(), [logs])
   const logCountByExercise = useMemo(() => {
     const map = new Map<string, number>()
@@ -327,39 +348,75 @@ function WorkoutView() {
       </header>
 
       <WeeklyCalendar selectedDay={selectedDay} onSelectDay={setSelectedDay} />
-      <div className="mb-5 px-1">
-        <div className="grid grid-cols-4 gap-2 bg-[#2A333E] rounded-xl p-1 border border-slate-700">
+      <div className="mb-6 px-1">
+        <div className="flex items-center gap-2 bg-[#2A333E] rounded-2xl p-1.5 border border-slate-700 shadow-[0_12px_30px_rgba(0,0,0,0.2)] overflow-hidden">
           <button
             onClick={() => setActiveTab('time')}
-            className={`py-2 rounded-lg text-[9px] font-black uppercase tracking-widest ${
-              activeTab === 'time' ? 'bg-orange-500 text-white' : 'text-slate-400'
+            className={`h-11 rounded-xl text-[9px] font-black uppercase tracking-widest flex items-center justify-center transition-all duration-300 ${
+              activeTab === 'time'
+                ? 'bg-orange-500 text-white shadow-[0_8px_20px_rgba(249,115,22,0.35)] flex-[2.2] px-3 gap-1.5'
+                : 'text-slate-400 hover:bg-[#364252] hover:text-slate-200 w-11 flex-none px-0'
             }`}
           >
-            Time
+            <Clock3 size={12} />
+            <span
+              className={`transition-all duration-300 whitespace-nowrap overflow-hidden ${
+                activeTab === 'time' ? 'max-w-[140px] opacity-100' : 'max-w-0 opacity-0'
+              }`}
+            >
+              Time
+            </span>
           </button>
           <button
             onClick={() => setActiveTab('categories')}
-            className={`py-2 rounded-lg text-[9px] font-black uppercase tracking-widest ${
-              activeTab === 'categories' ? 'bg-orange-500 text-white' : 'text-slate-400'
+            className={`h-11 rounded-xl text-[9px] font-black uppercase tracking-widest flex items-center justify-center transition-all duration-300 ${
+              activeTab === 'categories'
+                ? 'bg-orange-500 text-white shadow-[0_8px_20px_rgba(249,115,22,0.35)] flex-[2.2] px-3 gap-1.5'
+                : 'text-slate-400 hover:bg-[#364252] hover:text-slate-200 w-11 flex-none px-0'
             }`}
           >
-            Categories
+            <Tag size={12} />
+            <span
+              className={`transition-all duration-300 whitespace-nowrap overflow-hidden ${
+                activeTab === 'categories' ? 'max-w-[140px] opacity-100' : 'max-w-0 opacity-0'
+              }`}
+            >
+              Categories
+            </span>
           </button>
           <button
             onClick={() => setActiveTab('exercises')}
-            className={`py-2 rounded-lg text-[9px] font-black uppercase tracking-widest ${
-              activeTab === 'exercises' ? 'bg-orange-500 text-white' : 'text-slate-400'
+            className={`h-11 rounded-xl text-[9px] font-black uppercase tracking-widest flex items-center justify-center transition-all duration-300 ${
+              activeTab === 'exercises'
+                ? 'bg-orange-500 text-white shadow-[0_8px_20px_rgba(249,115,22,0.35)] flex-[2.2] px-3 gap-1.5'
+                : 'text-slate-400 hover:bg-[#364252] hover:text-slate-200 w-11 flex-none px-0'
             }`}
           >
-            Exercises
+            <Dumbbell size={12} />
+            <span
+              className={`transition-all duration-300 whitespace-nowrap overflow-hidden ${
+                activeTab === 'exercises' ? 'max-w-[140px] opacity-100' : 'max-w-0 opacity-0'
+              }`}
+            >
+              Exercises
+            </span>
           </button>
           <button
             onClick={() => setActiveTab('history')}
-            className={`py-2 rounded-lg text-[9px] font-black uppercase tracking-widest ${
-              activeTab === 'history' ? 'bg-orange-500 text-white' : 'text-slate-400'
+            className={`h-11 rounded-xl text-[9px] font-black uppercase tracking-widest flex items-center justify-center transition-all duration-300 ${
+              activeTab === 'history'
+                ? 'bg-orange-500 text-white shadow-[0_8px_20px_rgba(249,115,22,0.35)] flex-[2.2] px-3 gap-1.5'
+                : 'text-slate-400 hover:bg-[#364252] hover:text-slate-200 w-11 flex-none px-0'
             }`}
           >
-            History
+            <History size={12} />
+            <span
+              className={`transition-all duration-300 whitespace-nowrap overflow-hidden ${
+                activeTab === 'history' ? 'max-w-[140px] opacity-100' : 'max-w-0 opacity-0'
+              }`}
+            >
+              History
+            </span>
           </button>
         </div>
       </div>
@@ -686,7 +743,13 @@ function WorkoutView() {
         </section>
       )}
 
-      <Chat />
+      <Chat
+        context={{
+          selectedDay,
+          activeTab,
+        }}
+        onWorkoutDataChanged={handleAssistantWorkoutChanged}
+      />
     </div>
   )
 }
