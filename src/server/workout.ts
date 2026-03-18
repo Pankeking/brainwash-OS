@@ -212,14 +212,13 @@ function getWeekStartDayKey(dayKey: string) {
   return addDaysToDayKey(dayKey, mondayDiff)
 }
 
-function getMonthRangeFromDayKey(dayKey: string) {
-  const parsed = parseDayKey(dayKey)
-  const first = formatDayKey(parsed.year, parsed.month, 1)
-  const lastDate = new Date(Date.UTC(parsed.year, parsed.month, 0))
-  const last = formatDayKey(parsed.year, parsed.month, lastDate.getUTCDate())
-  const start = getUtcRangeForDayKey(first).start
-  const end = getUtcRangeForDayKey(last).end
-  return { start, end }
+function getRollingRangeFromDayKey(dayKey: string, totalDays: number) {
+  const endDayKey = parseDayKey(dayKey).key
+  const startDayKey = addDaysToDayKey(endDayKey, -(totalDays - 1))
+  return {
+    start: getUtcRangeForDayKey(startDayKey).start,
+    end: getUtcRangeForDayKey(endDayKey).end,
+  }
 }
 
 function formatDayKeyForLabel(dayKey: string) {
@@ -293,13 +292,9 @@ export const getWorkoutDayFn = createServerFn({ method: 'POST' })
       const selectedDayKey = parseSelectedDayKey(data.selectedDay)
       const selectedDayRange = getUtcRangeForDayKey(selectedDayKey)
       const weekday = getWeekdayFromDayKey(selectedDayKey)
-      const weekStartDayKey = getWeekStartDayKey(selectedDayKey)
-      const weekEndDayKey = addDaysToDayKey(weekStartDayKey, 6)
-      const weekRange = {
-        start: getUtcRangeForDayKey(weekStartDayKey).start,
-        end: getUtcRangeForDayKey(weekEndDayKey).end,
-      }
-      const monthRange = getMonthRangeFromDayKey(selectedDayKey)
+      const todayDayKey = dayKeyFromDateInTimeZone(new Date(), APP_TIMEZONE)
+      const weekRange = getRollingRangeFromDayKey(todayDayKey, 7)
+      const monthRange = getRollingRangeFromDayKey(todayDayKey, 30)
 
       const [categories, exerciseDocs, workoutLog, weekRangeLogs, monthRangeLogs] =
         await Promise.all([
