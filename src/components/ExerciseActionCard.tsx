@@ -282,7 +282,7 @@ export default function ExerciseActionCard({
                     <div className="bg-[#1A1F26] rounded-xl border border-slate-700 p-2.5">
                       <div className="flex items-center justify-between gap-2">
                         <div className="text-[9px] uppercase tracking-widest font-black text-slate-400">
-                          Sets per week
+                          Sets this calendar week
                         </div>
                         <div className="text-[9px] uppercase tracking-widest font-black text-orange-400">
                           {weekSetsDone}
@@ -488,14 +488,14 @@ export default function ExerciseActionCard({
                       </div>
                     </div>
                     <div className="grid grid-cols-3 gap-2">
-                      <div className="text-[10px] font-black text-slate-300">Week</div>
+                      <div className="text-[10px] font-black text-slate-300">Last 7d</div>
                       <div className="text-[11px] font-black text-center text-green-400">
                         {stats.week.best ?? '-'}
                       </div>
                       <div className="text-[11px] font-black text-center text-slate-300">
                         {stats.week.avg ?? '-'} / {stats.week.worst ?? '-'}
                       </div>
-                      <div className="text-[10px] font-black text-slate-300">Month</div>
+                      <div className="text-[10px] font-black text-slate-300">Last 30d</div>
                       <div className="text-[11px] font-black text-center text-green-400">
                         {stats.month.best ?? '-'}
                       </div>

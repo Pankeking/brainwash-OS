@@ -295,8 +295,14 @@ export const getWorkoutDayFn = createServerFn({ method: 'POST' })
       const todayDayKey = dayKeyFromDateInTimeZone(new Date(), APP_TIMEZONE)
       const weekRange = getRollingRangeFromDayKey(todayDayKey, 7)
       const monthRange = getRollingRangeFromDayKey(todayDayKey, 30)
+      const currentWeekStartDayKey = getWeekStartDayKey(todayDayKey)
+      const currentWeekEndDayKey = addDaysToDayKey(currentWeekStartDayKey, 6)
+      const currentWeekRange = {
+        start: getUtcRangeForDayKey(currentWeekStartDayKey).start,
+        end: getUtcRangeForDayKey(currentWeekEndDayKey).end,
+      }
 
-      const [categories, exerciseDocs, workoutLog, weekRangeLogs, monthRangeLogs] =
+      const [categories, exerciseDocs, workoutLog, currentWeekLogs, weekRangeLogs, monthRangeLogs] =
         await Promise.all([
           ExerciseCategoryModel.find({ userId }).sort({ createdAt: 1 }).lean(),
           ExerciseModel.find({ userId }).sort({ createdAt: 1 }).lean(),
@@ -306,6 +312,13 @@ export const getWorkoutDayFn = createServerFn({ method: 'POST' })
             date: {
               $gte: selectedDayRange.start,
               $lte: selectedDayRange.end,
+            },
+          }).lean(),
+          WorkoutLogModel.find({
+            userId,
+            date: {
+              $gte: currentWeekRange.start,
+              $lte: currentWeekRange.end,
             },
           }).lean(),
           WorkoutLogModel.find({
@@ -362,6 +375,14 @@ export const getWorkoutDayFn = createServerFn({ method: 'POST' })
       }
 
       const weekSetsByExercise = collectSetsByExercise(
+        currentWeekLogs as Array<{
+          exercises: Array<{
+            exercise: { exerciseId: mongoose.Types.ObjectId }
+            sets: Array<{ type: SetType; reps?: number; duration?: number }>
+          }>
+        }>,
+      )
+      const rollingWeekSetsByExercise = collectSetsByExercise(
         weekRangeLogs as Array<{
           exercises: Array<{
             exercise: { exerciseId: mongoose.Types.ObjectId }
@@ -381,6 +402,7 @@ export const getWorkoutDayFn = createServerFn({ method: 'POST' })
       const exercises = exerciseDocs.map((exercise) => {
         const id = String(exercise._id)
         const weekSetRecords = weekSetsByExercise.get(id) || []
+        const rollingWeekSetRecords = rollingWeekSetsByExercise.get(id) || []
         const parsedWeeklyGoal =
           exercise.weeklySetGoal === null || exercise.weeklySetGoal === undefined
             ? null
@@ -394,7 +416,7 @@ export const getWorkoutDayFn = createServerFn({ method: 'POST' })
           weeklySetGoal: Number.isFinite(parsedWeeklyGoal) ? parsedWeeklyGoal : null,
           weekSetsDone: weekSetRecords.length,
           stats: {
-            week: getStatsFromSets(weekSetRecords),
+            week: getStatsFromSets(rollingWeekSetRecords),
             month: getStatsFromSets(monthSetsByExercise.get(id) || []),
           },
         }
