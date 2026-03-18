@@ -635,6 +635,40 @@ function WorkoutView() {
     })
     return map
   }, [filteredLogs])
+  const latestLogTimestampByExercise = useMemo(() => {
+    const map = new Map<string, number>()
+    logs.forEach((log) => {
+      const timestamp = new Date(log.timestamp).getTime()
+      const previousTimestamp = map.get(log.exerciseId) || 0
+      if (timestamp > previousTimestamp) {
+        map.set(log.exerciseId, timestamp)
+      }
+    })
+    return map
+  }, [logs])
+  const sortedExercises = useMemo(() => {
+    const hasGoal = (exercise: Exercise) =>
+      exercise.weeklySetGoal !== null && exercise.weeklySetGoal > 0
+    const isGoalCompleted = (exercise: Exercise) =>
+      hasGoal(exercise) && exercise.weekSetsDone >= (exercise.weeklySetGoal || 0)
+    const isBottomPriority = (exercise: Exercise) => !hasGoal(exercise) || isGoalCompleted(exercise)
+
+    return myExercises.slice().sort((left, right) => {
+      const leftBottomPriority = isBottomPriority(left)
+      const rightBottomPriority = isBottomPriority(right)
+      if (leftBottomPriority !== rightBottomPriority) {
+        return leftBottomPriority ? 1 : -1
+      }
+
+      const leftLastLog = latestLogTimestampByExercise.get(left.id) || 0
+      const rightLastLog = latestLogTimestampByExercise.get(right.id) || 0
+      if (leftLastLog !== rightLastLog) {
+        return rightLastLog - leftLastLog
+      }
+
+      return left.name.localeCompare(right.name)
+    })
+  }, [myExercises, latestLogTimestampByExercise])
 
   return (
     <div className="min-h-screen bg-[#1A1F26] text-slate-100 p-5 font-sans pb-32">
@@ -914,7 +948,7 @@ function WorkoutView() {
                     </p>
                   </div>
                 )}
-                {myExercises.map((ex) => (
+                {sortedExercises.map((ex) => (
                   <ExerciseActionCard
                     key={ex.id}
                     id={ex.id}
