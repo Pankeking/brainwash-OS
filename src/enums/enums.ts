@@ -1,4 +1,4 @@
-import Weekday from './Weekday'
-import SetType from './SetType'
+import Weekday from './Weekday.js'
+import SetType from './SetType.js'
 
 export { Weekday, SetType }

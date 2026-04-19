@@ -49,6 +49,11 @@ Use this file as the first-pass guide for humans and LLMs editing this repo.
 - Do not keep unused example queries, empty server files, placeholder routes, or UI buttons with no behavior.
 - If the shipped app does not use it, delete it instead of keeping “maybe later” code in the main tree.
 
+10. Dead code must fail lint.
+
+- Unused imports and unused locals are treated as lint errors.
+- If a helper/export/file is not used, remove it or justify it by wiring it into the shipped app.
+
 ## Body Metric Rule
 
 Body metric definitions must come from:

@@ -1,7 +1,7 @@
 import type mongoose from 'mongoose'
 
-import { SetType, Weekday } from '~/enums/enums'
-import { WorkoutLogModel } from '~/models/WorkoutLog.model'
+import { SetType, Weekday } from '../enums/enums.js'
+import { WorkoutLogModel } from '../models/WorkoutLog.model.js'
 
 import {
   createLogTimestampForDayKey,
@@ -9,7 +9,7 @@ import {
   formatDayKey,
   getUtcRangeForDayKey as getUtcRangeForDayKeyInTimeZone,
   parseDayKey,
-} from './dayKey'
+} from './dayKey.js'
 
 export const APP_TIMEZONE = 'Europe/Berlin'
 

@@ -24,11 +24,23 @@ test('parseDayKey accepts valid calendar dates and rejects invalid ones', () => 
   })
   assert.throws(() => parseDayKey('2026-02-30'))
   assert.throws(() => parseDayKey('19-04-2026'))
+  assert.throws(() => parseDayKey('2026-13-01'))
 })
 
 test('dayKeyFromDateInTimeZone maps UTC timestamps into local workout days', () => {
   const utcDate = new Date('2026-04-18T22:30:00.000Z')
   assert.equal(dayKeyFromDateInTimeZone(utcDate, TIME_ZONE), '2026-04-19')
+})
+
+test('dayKeyFromDateInTimeZone stays stable across DST boundaries', () => {
+  assert.equal(
+    dayKeyFromDateInTimeZone(new Date('2026-03-29T00:30:00.000Z'), TIME_ZONE),
+    '2026-03-29',
+  )
+  assert.equal(
+    dayKeyFromDateInTimeZone(new Date('2026-10-25T22:30:00.000Z'), TIME_ZONE),
+    '2026-10-25',
+  )
 })
 
 test('resolveSelectedDayKey preserves valid keys and falls back for invalid input', () => {
@@ -47,4 +59,14 @@ test('createLogTimestampForDayKey keeps the selected local day while copying tim
   const now = new Date('2026-04-19T18:20:30.456Z')
   const loggedAt = createLogTimestampForDayKey('2026-03-25', TIME_ZONE, now)
   assert.equal(dayKeyFromDateInTimeZone(loggedAt, TIME_ZONE), '2026-03-25')
+})
+
+test('getUtcRangeForDayKey spans a full local day during DST changes', () => {
+  const spring = getUtcRangeForDayKey('2026-03-29', TIME_ZONE)
+  const fall = getUtcRangeForDayKey('2026-10-25', TIME_ZONE)
+
+  assert.equal(dayKeyFromDateInTimeZone(spring.start, TIME_ZONE), '2026-03-29')
+  assert.equal(dayKeyFromDateInTimeZone(spring.end, TIME_ZONE), '2026-03-29')
+  assert.equal(dayKeyFromDateInTimeZone(fall.start, TIME_ZONE), '2026-10-25')
+  assert.equal(dayKeyFromDateInTimeZone(fall.end, TIME_ZONE), '2026-10-25')
 })

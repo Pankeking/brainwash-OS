@@ -1,9 +1,9 @@
 import type mongoose from 'mongoose'
 
-import { SetType } from '~/enums/enums'
+import { SetType } from '../enums/enums.js'
 
 import type { FlatSetRecord } from './workout.utils'
-import { getStatsFromSets, setToNumericValue } from './workout.utils'
+import { getStatsFromSets, setToNumericValue } from './workout.utils.js'
 
 export function collectSetsByExercise(
   logs: Array<{

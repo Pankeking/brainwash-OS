@@ -15,12 +15,14 @@ test('normalizeDecimalInput accepts comma decimal separators', () => {
 test('parseLocaleNumberInput accepts dot and comma decimals', () => {
   assert.equal(parseLocaleNumberInput('68.5'), 68.5)
   assert.equal(parseLocaleNumberInput('68,5'), 68.5)
+  assert.equal(parseLocaleNumberInput(' 68,50 '), 68.5)
   assert.equal(parseLocaleNumberInput(68.5), 68.5)
 })
 
 test('parseLocaleNumberInput rejects invalid numeric text', () => {
   assert.equal(parseLocaleNumberInput('abc'), null)
   assert.equal(parseLocaleNumberInput('68,5,1'), null)
+  assert.equal(parseLocaleNumberInput('68..5'), null)
   assert.equal(parseLocaleNumberInput(''), null)
 })
 
