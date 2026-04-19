@@ -1,6 +1,7 @@
 import { Check, Tag, X } from 'lucide-react'
 
 import { WORKOUT_CATEGORY_COLORS } from './workout.constants'
+import { groupCategoriesByColor } from './workout.sorting'
 import type { WeeklyCategoryStatsData, WorkoutCategory } from './workout.types'
 
 interface WorkoutCategoriesTabProps {
@@ -30,6 +31,8 @@ export function WorkoutCategoriesTab({
   onShowMoreWeeks,
   weeklyStatsData,
 }: WorkoutCategoriesTabProps) {
+  const colorGroups = groupCategoriesByColor(categories)
+
   return (
     <>
       <div className="mb-8">
@@ -70,28 +73,52 @@ export function WorkoutCategoriesTab({
             </p>
           </div>
         ) : (
-          <div className="flex flex-wrap gap-2 px-1">
-            {categories.map((category) => (
+          <div className="space-y-3 px-1">
+            {colorGroups.map((group) => (
               <div
-                key={category.id}
-                className="flex items-center gap-1.5 bg-[#2A333E] px-2 py-1 rounded-lg border border-slate-700 cursor-pointer"
-                onClick={() => onCycleCategoryColor(category)}
-                title={`Color: ${
-                  WORKOUT_CATEGORY_COLORS.find((option) => option.hex === category.color)?.name ||
-                  'Custom'
-                }`}
+                key={group.color}
+                className="rounded-xl border border-slate-800 bg-[#222a33]/50 p-2"
               >
-                <div className="w-2 h-2 rounded-full" style={{ backgroundColor: category.color }} />
-                <span className="text-[10px] font-bold text-slate-300">{category.name}</span>
-                <button
-                  onClick={(event) => {
-                    event.stopPropagation()
-                    onRemoveCategory(category.id)
-                  }}
-                  className="ml-1 text-slate-600 hover:text-red-500"
-                >
-                  <X size={10} />
-                </button>
+                <div className="mb-2 flex items-center gap-2 text-[9px] font-black uppercase tracking-widest text-slate-500">
+                  <span
+                    className="inline-block h-2 w-2 rounded-full"
+                    style={{ backgroundColor: group.color }}
+                  />
+                  {WORKOUT_CATEGORY_COLORS.find((option) => option.hex === group.color)?.name ||
+                    'Custom'}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {group.items.map((category) => (
+                    <div
+                      key={category.id}
+                      className="flex items-center gap-1.5 rounded-lg border px-2 py-1 cursor-pointer"
+                      onClick={() => onCycleCategoryColor(category)}
+                      style={{
+                        backgroundColor: `${category.color}22`,
+                        borderColor: `${category.color}66`,
+                      }}
+                      title={`Color: ${
+                        WORKOUT_CATEGORY_COLORS.find((option) => option.hex === category.color)
+                          ?.name || 'Custom'
+                      }`}
+                    >
+                      <div
+                        className="w-2 h-2 rounded-full"
+                        style={{ backgroundColor: category.color }}
+                      />
+                      <span className="text-[10px] font-bold text-slate-200">{category.name}</span>
+                      <button
+                        onClick={(event) => {
+                          event.stopPropagation()
+                          onRemoveCategory(category.id)
+                        }}
+                        className="ml-1 text-slate-500 hover:text-red-500"
+                      >
+                        <X size={10} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
               </div>
             ))}
           </div>

@@ -1,6 +1,6 @@
 export type ChatContext = {
   selectedDay?: string
-  activeTab?: 'time' | 'categories' | 'exercises' | 'history'
+  activeTab?: 'time' | 'categories' | 'exercises' | 'body' | 'history'
 }
 
 export interface ChatProps {

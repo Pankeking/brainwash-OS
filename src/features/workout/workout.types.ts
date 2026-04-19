@@ -52,4 +52,35 @@ export interface WeeklyCategoryStatsData {
   rows: WeeklyCategoryStatsRow[]
 }
 
-export type WorkoutTab = 'time' | 'categories' | 'exercises' | 'history'
+export interface BodyMetricDefinition {
+  key: string
+  label: string
+  kind: 'weight' | 'size'
+  unit: 'kg' | 'cm'
+}
+
+export interface BodyMetricEntry {
+  id: string
+  metricKey: string
+  label: string
+  kind: 'weight' | 'size'
+  unit: 'kg' | 'cm'
+  value: number
+  loggedAt: string
+}
+
+export interface BodyMetricLatestValue {
+  metricKey: string
+  label: string
+  unit: 'kg' | 'cm'
+  value: number
+  loggedAt: string
+}
+
+export interface BodyMetricsDayData {
+  definitions: BodyMetricDefinition[]
+  entries: BodyMetricEntry[]
+  latest: BodyMetricLatestValue[]
+}
+
+export type WorkoutTab = 'time' | 'categories' | 'exercises' | 'body' | 'history'

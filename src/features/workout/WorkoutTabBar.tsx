@@ -1,4 +1,4 @@
-import { Clock3, Dumbbell, History, Tag } from 'lucide-react'
+import { Clock3, Dumbbell, History, Ruler, Tag } from 'lucide-react'
 import { type LucideIcon } from 'lucide-react'
 
 import type { WorkoutTab } from './workout.types'
@@ -13,6 +13,7 @@ const WORKOUT_TABS: WorkoutTabOption[] = [
   { icon: Clock3, label: 'Time', value: 'time' },
   { icon: Tag, label: 'Categories', value: 'categories' },
   { icon: Dumbbell, label: 'Exercises', value: 'exercises' },
+  { icon: Ruler, label: 'Body', value: 'body' },
   { icon: History, label: 'History', value: 'history' },
 ]
 

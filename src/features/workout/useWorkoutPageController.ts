@@ -1,0 +1,251 @@
+import { useEffect, useMemo, useState } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+
+import { SetType } from '~/enums/enums'
+import {
+  getBodyMetricsDayFn,
+  getWorkoutDayFn,
+  getWorkoutWeeklyCategoryStatsFn,
+} from '~/server/workout'
+
+import { WORKOUT_CATEGORY_COLORS } from './workout.constants'
+import {
+  buildLatestLogTimestampByExercise,
+  buildLogCountByExercise,
+  sortExercisesForDisplay,
+} from './workout.sorting'
+import type {
+  BodyMetricsDayData,
+  WeeklyCategoryStatsData,
+  WorkoutCategory,
+  WorkoutExercise,
+  WorkoutLog,
+  WorkoutTab,
+} from './workout.types'
+import { useBodyMetricMutations } from './useBodyMetricMutations'
+import { useWorkoutCategoryMutations } from './useWorkoutCategoryMutations'
+import { useWorkoutExerciseMutations } from './useWorkoutExerciseMutations'
+import { useWorkoutSetMutations } from './useWorkoutSetMutations'
+
+interface WorkoutLoaderData {
+  bodyMetricsData: BodyMetricsDayData
+  selectedDay: string
+  weeklyStatsData: WeeklyCategoryStatsData
+  workoutDayData: {
+    categories: WorkoutCategory[]
+    exercises: WorkoutExercise[]
+    logs: WorkoutLog[]
+  }
+}
+
+type WorkoutDayQueryData = WorkoutLoaderData['workoutDayData']
+
+export function useWorkoutPageController(loaderData: WorkoutLoaderData) {
+  const queryClient = useQueryClient()
+  const [activeTab, setActiveTab] = useState<WorkoutTab>('exercises')
+  const [confirmDeleteSetId, setConfirmDeleteSetId] = useState<string | null>(null)
+  const [expandedExerciseId, setExpandedExerciseId] = useState<string | null>(null)
+  const [isAddingCategory, setIsAddingCategory] = useState(false)
+  const [isAddingExercise, setIsAddingExercise] = useState(false)
+  const [metricDrafts, setMetricDrafts] = useState<Record<string, string>>({})
+  const [newCategoryName, setNewCategoryName] = useState('')
+  const [newExerciseName, setNewExerciseName] = useState('')
+  const [notice, setNotice] = useState<{ message: string; tone: 'error' | 'info' } | null>(null)
+  const [selectedDay, setSelectedDay] = useState(loaderData.selectedDay)
+  const [timerAutoStartToken, setTimerAutoStartToken] = useState(0)
+  const [weeksToShow, setWeeksToShow] = useState(4)
+
+  const focusRunningStopwatch = () => {
+    setActiveTab('time')
+    setTimerAutoStartToken((current) => current + 1)
+  }
+
+  const initialWorkoutDayData: WorkoutDayQueryData | undefined =
+    selectedDay === loaderData.selectedDay ? loaderData.workoutDayData : undefined
+
+  const { data, isLoading } = useQuery<WorkoutDayQueryData>({
+    queryKey: ['workout-day', selectedDay],
+    queryFn: () => getWorkoutDayFn({ data: { selectedDay } }),
+    initialData: initialWorkoutDayData,
+    staleTime: 30_000,
+    refetchOnWindowFocus: false,
+  })
+  const { data: weeklyStatsData, isLoading: isWeeklyStatsLoading } =
+    useQuery<WeeklyCategoryStatsData>({
+      queryKey: ['workout-weekly-category-stats', weeksToShow],
+      queryFn: () => getWorkoutWeeklyCategoryStatsFn({ data: { weeks: weeksToShow } }),
+      initialData: weeksToShow === 4 ? loaderData.weeklyStatsData : undefined,
+      staleTime: 30_000,
+      refetchOnWindowFocus: false,
+    })
+  const { data: bodyMetricsData } = useQuery<BodyMetricsDayData>({
+    queryKey: ['body-metrics-day', selectedDay],
+    queryFn: () => getBodyMetricsDayFn({ data: { selectedDay } }),
+    initialData: selectedDay === loaderData.selectedDay ? loaderData.bodyMetricsData : undefined,
+    staleTime: 30_000,
+    refetchOnWindowFocus: false,
+  })
+
+  const categories: WorkoutCategory[] = data?.categories || []
+  const exercises: WorkoutExercise[] = data?.exercises || []
+  const logs: WorkoutLog[] = data?.logs || []
+
+  const { addCategoryMutation, cycleCategoryColor, removeCategoryMutation } =
+    useWorkoutCategoryMutations({
+      onAddedCategory: () => {
+        setNewCategoryName('')
+        setIsAddingCategory(false)
+      },
+      queryClient,
+      selectedDay,
+      weeksToShow,
+    })
+  const {
+    addExerciseMutation,
+    removeExerciseMutation,
+    renameExerciseMutation,
+    toggleExerciseCategoryMutation,
+    updateExerciseWeeklyGoalMutation,
+  } = useWorkoutExerciseMutations({
+    onAddedExercise: () => {
+      setNewExerciseName('')
+      setIsAddingExercise(false)
+    },
+    queryClient,
+    selectedDay,
+    weeksToShow,
+  })
+  const { addSetMutation, removeSetMutation } = useWorkoutSetMutations({
+    onRemovedSet: () => setConfirmDeleteSetId(null),
+    onSetLogFailed: () =>
+      setNotice({
+        message: 'Set log failed. Timer kept running.',
+        tone: 'error',
+      }),
+    queryClient,
+    weeksToShow,
+  })
+  const { removeMetricMutation, upsertMetricMutation } = useBodyMetricMutations({
+    queryClient,
+    selectedDay,
+  })
+
+  const filteredLogs = useMemo(() => logs.slice().reverse(), [logs])
+  const logCountByExercise = useMemo(() => buildLogCountByExercise(filteredLogs), [filteredLogs])
+  const latestLogTimestampByExercise = useMemo(
+    () => buildLatestLogTimestampByExercise(logs),
+    [logs],
+  )
+  const sortedExercises = useMemo(
+    () => sortExercisesForDisplay(exercises, categories, latestLogTimestampByExercise),
+    [categories, exercises, latestLogTimestampByExercise],
+  )
+
+  const handleAddCategory = () => {
+    const trimmedName = newCategoryName.trim()
+    if (!trimmedName) {
+      return
+    }
+    const color = WORKOUT_CATEGORY_COLORS[categories.length % WORKOUT_CATEGORY_COLORS.length].hex
+    addCategoryMutation.mutate({ data: { name: trimmedName, color } })
+  }
+
+  const handleAddExercise = () => {
+    const trimmedName = newExerciseName.trim()
+    if (!trimmedName) {
+      return
+    }
+    addExerciseMutation.mutate({ data: { selectedDay, name: trimmedName } })
+  }
+
+  const handleAddSet = (exercise: WorkoutExercise, payload: { type: SetType; value: number }) => {
+    focusRunningStopwatch()
+    setNotice(null)
+    addSetMutation.mutate({
+      data: {
+        selectedDay,
+        exerciseId: exercise.id,
+        type: payload.type,
+        reps: payload.type === SetType.REPS ? payload.value : undefined,
+        duration: payload.type === SetType.TIMED ? payload.value : undefined,
+      },
+    })
+  }
+
+  const handleSaveMetric = (metricKey: string) => {
+    const value = Number(metricDrafts[metricKey])
+    if (!Number.isFinite(value) || value <= 0) {
+      setNotice({
+        message: 'Enter a valid body metric value first.',
+        tone: 'error',
+      })
+      return
+    }
+    upsertMetricMutation.mutate({
+      data: { selectedDay, metricKey, value },
+    })
+    setMetricDrafts((current) => ({
+      ...current,
+      [metricKey]: '',
+    }))
+    setNotice(null)
+  }
+
+  useEffect(() => {
+    if (!notice) {
+      return
+    }
+    const timeoutId = setTimeout(() => {
+      setNotice(null)
+    }, 4000)
+    return () => clearTimeout(timeoutId)
+  }, [notice])
+
+  return {
+    activeTab,
+    bodyMetricsData,
+    categories,
+    confirmDeleteSetId,
+    cycleCategoryColor,
+    expandedExerciseId,
+    filteredLogs,
+    handleAddCategory,
+    handleAddExercise,
+    handleAddSet,
+    handleSaveMetric,
+    isAddingCategory,
+    isAddingExercise,
+    isLoading,
+    isWeeklyStatsLoading,
+    logCountByExercise,
+    metricDrafts,
+    newCategoryName,
+    newExerciseName,
+    notice,
+    onAssistantWorkoutChanged: (nextSelectedDay: string) => {
+      setSelectedDay(nextSelectedDay)
+      focusRunningStopwatch()
+    },
+    removeCategoryMutation,
+    removeExerciseMutation,
+    removeMetricMutation,
+    removeSetMutation,
+    renameExerciseMutation,
+    selectedDay,
+    setActiveTab,
+    setConfirmDeleteSetId,
+    setExpandedExerciseId,
+    setIsAddingCategory,
+    setIsAddingExercise,
+    setMetricDrafts,
+    setNewCategoryName,
+    setNewExerciseName,
+    setSelectedDay,
+    setWeeksToShow,
+    sortedExercises,
+    timerAutoStartToken,
+    toggleExerciseCategoryMutation,
+    updateExerciseWeeklyGoalMutation,
+    weeklyStatsData,
+  }
+}

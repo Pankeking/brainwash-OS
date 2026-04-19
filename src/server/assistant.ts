@@ -24,7 +24,7 @@ const assistantChatInputSchema = z.object({
   context: z
     .object({
       selectedDay: z.string().optional(),
-      activeTab: z.enum(['time', 'categories', 'exercises', 'history']).optional(),
+      activeTab: z.enum(['time', 'categories', 'exercises', 'body', 'history']).optional(),
     })
     .optional(),
 })
@@ -36,7 +36,7 @@ const assistantLogDirectInputSchema = z.object({
   context: z
     .object({
       selectedDay: z.string().optional(),
-      activeTab: z.enum(['time', 'categories', 'exercises', 'history']).optional(),
+      activeTab: z.enum(['time', 'categories', 'exercises', 'body', 'history']).optional(),
     })
     .optional(),
 })
@@ -256,7 +256,7 @@ async function logAssistantSet(payload: {
   setType: 'reps' | 'timed'
   value: number
   selectedDay?: string
-  activeTab?: 'time' | 'categories' | 'exercises' | 'history'
+  activeTab?: 'time' | 'categories' | 'exercises' | 'body' | 'history'
   model: string | null
 }) {
   const contextSelectedDay = resolveSelectedDayKey(payload.selectedDay, APP_TIMEZONE)

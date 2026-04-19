@@ -36,10 +36,16 @@ export default [
       ],
       complexity: ['warn', 40],
       eqeqeq: ['error', 'always'],
-      'max-lines': ['warn', { max: 700, skipBlankLines: true, skipComments: true }],
+      'max-lines': ['warn', { max: 300, skipBlankLines: true, skipComments: true }],
       'no-console': ['warn', { allow: ['warn', 'error'] }],
       'object-shorthand': 'warn',
       'prettier/prettier': 'warn',
+    },
+  },
+  {
+    files: ['src/components/Chat.tsx', 'src/server/assistant.ts', 'src/server/voice.ts'],
+    rules: {
+      'max-lines': ['warn', { max: 800, skipBlankLines: true, skipComments: true }],
     },
   },
   eslintConfigPrettier,
