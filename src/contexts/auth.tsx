@@ -11,7 +11,7 @@ type User = {
 type AuthContextType = {
   user: User | null | undefined
   isLoading: boolean
-  refetch: () => void
+  refetch: () => Promise<unknown>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)

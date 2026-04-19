@@ -21,22 +21,15 @@ function Home() {
 
   const logoutMutation = useMutation({
     mutationFn: logoutFn,
-    onSuccess: () => {
-      refetch()
+    onSuccess: async () => {
+      await refetch()
       queryClient.invalidateQueries({ queryKey: ['currentUser'] })
-    },
-    onError: (error) => {
-      console.error('Logout failed:', error)
     },
   })
   const initiateOAuthMutation = useMutation({
     mutationFn: (input: InitiateOAuthInput) => initiateOAuthFn({ data: input }),
     onSuccess: (data) => {
-      console.log('Initiated OAuth successfully')
       window.location.href = data.url
-    },
-    onError: (error) => {
-      console.error('Failed to initiate OAuth:', error)
     },
   })
 
@@ -103,9 +96,11 @@ function Home() {
         )}
       </div>
 
-      <div className="fixed bottom-10">
-        <Chat />
-      </div>
+      {user ? (
+        <div className="fixed bottom-10">
+          <Chat />
+        </div>
+      ) : null}
     </div>
   )
 }

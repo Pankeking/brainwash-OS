@@ -6,7 +6,14 @@ import eslintConfigPrettier from 'eslint-config-prettier'
 
 export default [
   {
-    ignores: ['prettier.config.cjs', 'eslint.config.mjs', 'routeTree.gen.ts'],
+    ignores: [
+      'prettier.config.cjs',
+      'eslint.config.mjs',
+      '**/routeTree.gen.ts',
+      '.output/**',
+      'dist/**',
+      '.test-dist/**',
+    ],
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,

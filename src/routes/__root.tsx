@@ -2,13 +2,11 @@
 import { HeadContent, Outlet, Scripts, createRootRouteWithContext } from '@tanstack/react-router'
 import * as React from 'react'
 import type { QueryClient as QueryClientType } from '@tanstack/react-query'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { QueryClientProvider } from '@tanstack/react-query'
 import { DefaultCatchBoundary } from '~/components/DefaultCatchBoundary'
 import { NotFound } from '~/components/NotFound'
 import appCss from '~/styles/app.css?url'
 import { AuthProvider } from '~/contexts/auth'
-
-const queryClient = new QueryClient()
 
 export const Route = createRootRouteWithContext<{
   queryClient: QueryClientType
@@ -58,6 +56,7 @@ export const Route = createRootRouteWithContext<{
 })
 
 function RootComponent() {
+  const { queryClient } = Route.useRouteContext()
   return (
     <RootDocument>
       <QueryClientProvider client={queryClient}>
@@ -75,8 +74,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
       <head>
         <HeadContent />
       </head>
-      <body className="p-2">
-        <hr />
+      <body>
         {children}
         <Scripts />
       </body>
