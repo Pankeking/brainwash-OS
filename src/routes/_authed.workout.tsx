@@ -133,6 +133,12 @@ function WorkoutView() {
   const [expandedExerciseId, setExpandedExerciseId] = useState<string | null>(null)
   const [weeksToShow, setWeeksToShow] = useState(4)
   const [activeTab, setActiveTab] = useState<WorkoutTab>('exercises')
+  const [timerAutoStartToken, setTimerAutoStartToken] = useState(0)
+
+  const focusRunningStopwatch = () => {
+    setActiveTab('time')
+    setTimerAutoStartToken((current) => current + 1)
+  }
 
   const refreshWorkoutDay = async (dayKey: string) => {
     await queryClient.invalidateQueries({
@@ -511,6 +517,9 @@ function WorkoutView() {
 
       return { previousData }
     },
+    onSuccess: () => {
+      focusRunningStopwatch()
+    },
     onError: (err, newSet, context) => {
       if (context?.previousData) {
         queryClient.setQueryData(['workout-day', newSet.data.selectedDay], context.previousData)
@@ -623,6 +632,7 @@ function WorkoutView() {
 
   const handleAssistantWorkoutChanged = (nextSelectedDay: string) => {
     setSelectedDay(nextSelectedDay)
+    focusRunningStopwatch()
     void refreshWorkoutDay(nextSelectedDay)
     invalidateWeeklyStats()
   }
@@ -759,7 +769,9 @@ function WorkoutView() {
         <div className="text-slate-400 text-center py-10 text-sm">Loading workout data...</div>
       ) : (
         <section className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-          {activeTab === 'time' && <WorkoutTimers />}
+          <div className={activeTab === 'time' ? 'block' : 'hidden'}>
+            <WorkoutTimers autoStartStopwatchToken={timerAutoStartToken} />
+          </div>
 
           {activeTab === 'categories' && (
             <>

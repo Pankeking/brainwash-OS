@@ -14,8 +14,12 @@ function formatMs(ms: number) {
   return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
 }
 
-export default function WorkoutTimers() {
-  const [mode, setMode] = useState<TimerMode>('countdown')
+interface WorkoutTimersProps {
+  autoStartStopwatchToken?: number
+}
+
+export default function WorkoutTimers({ autoStartStopwatchToken = 0 }: WorkoutTimersProps) {
+  const [mode, setMode] = useState<TimerMode>('stopwatch')
   const [countdownDurationSec, setCountdownDurationSec] = useState(300)
   const [countdownRemainingMs, setCountdownRemainingMs] = useState(300_000)
   const [countdownRunning, setCountdownRunning] = useState(false)
@@ -57,6 +61,21 @@ export default function WorkoutTimers() {
 
     return () => clearInterval(interval)
   }, [stopwatchRunning])
+
+  useEffect(() => {
+    if (autoStartStopwatchToken <= 0) {
+      return
+    }
+    setMode('stopwatch')
+    setStopwatchRunning((current) => {
+      if (current) {
+        return current
+      }
+      stopwatchStartedAtRef.current = Date.now()
+      stopwatchStartElapsedRef.current = stopwatchMs
+      return true
+    })
+  }, [autoStartStopwatchToken, stopwatchMs])
 
   const applyCountdownDuration = (nextDurationSec: number) => {
     const safeDurationSec = Math.max(1, nextDurationSec)
