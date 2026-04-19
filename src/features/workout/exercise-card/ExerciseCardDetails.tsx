@@ -4,7 +4,14 @@ import type { PointerEvent } from 'react'
 import { SetType } from '~/enums/enums'
 
 import { ExerciseCardMetaPane } from './ExerciseCardMetaPane'
+import { ExerciseCardValueStepper } from './ExerciseCardValueStepper'
 import type { ExerciseCardCategory } from './exercise-card.types'
+
+function formatTimedValue(value: number) {
+  const minutes = Math.floor(value / 60)
+  const seconds = value % 60
+  return `${minutes}m:${String(seconds).padStart(2, '0')}s`
+}
 
 interface ExerciseCardDetailsProps {
   allCategories: ExerciseCardCategory[]
@@ -67,6 +74,21 @@ export function ExerciseCardDetails({
   weeklySetGoal,
   weeklyVolumeGoal,
 }: ExerciseCardDetailsProps) {
+  const isTimed = setType === SetType.TIMED
+  const smallStep = isTimed ? 5 : 1
+  const largeStep = isTimed ? 30 : 5
+  const volumeSmallStep = isTimed ? 15 : 5
+  const volumeLargeStep = isTimed ? 60 : 25
+  const tempValueLabel = isTimed ? formatTimedValue(tempValue) : String(tempValue)
+  const weekVolumeDoneLabel = isTimed ? formatTimedValue(weekVolumeDone) : String(weekVolumeDone)
+  const weeklyVolumeGoalLabel =
+    weeklyVolumeGoal !== null
+      ? isTimed
+        ? formatTimedValue(weeklyVolumeGoal)
+        : String(weeklyVolumeGoal)
+      : null
+  const volumeGoalDraftLabel = isTimed ? formatTimedValue(volumeGoalDraft) : String(volumeGoalDraft)
+
   return (
     <div className="overflow-x-auto snap-x snap-mandatory">
       <div className="flex w-full">
@@ -141,35 +163,33 @@ export function ExerciseCardDetails({
               <div className="mt-3 border-t border-slate-700/40 pt-3">
                 <div className="flex items-center justify-between gap-2">
                   <div className="text-[9px] font-black uppercase tracking-widest text-slate-400">
-                    {setType === SetType.TIMED ? 'Weekly target seconds' : 'Weekly target reps'}
+                    {isTimed ? 'Weekly target time' : 'Weekly target reps'}
                   </div>
                   <div className="text-[9px] font-black uppercase tracking-widest text-orange-400">
-                    {weekVolumeDone}
-                    {weeklyVolumeGoal ? ` / ${weeklyVolumeGoal}` : ''}
+                    {weekVolumeDoneLabel}
+                    {weeklyVolumeGoalLabel ? ` / ${weeklyVolumeGoalLabel}` : ''}
                   </div>
                 </div>
                 <div className="mt-2 flex items-center gap-1">
-                  <button
-                    onClick={(event) => {
-                      event.stopPropagation()
-                      onSetVolumeGoalDraft((value) => Math.max(1, value - 5))
-                    }}
-                    className="w-7 h-7 flex items-center justify-center rounded-lg bg-[#2A333E] text-slate-300"
-                  >
-                    <Minus size={12} />
-                  </button>
-                  <div className="w-16 text-center font-mono text-sm font-black text-white">
-                    {volumeGoalDraft}
-                  </div>
-                  <button
-                    onClick={(event) => {
-                      event.stopPropagation()
-                      onSetVolumeGoalDraft((value) => value + 5)
-                    }}
-                    className="w-7 h-7 flex items-center justify-center rounded-lg bg-[#2A333E] text-slate-300"
-                  >
-                    <Plus size={12} />
-                  </button>
+                  <ExerciseCardValueStepper
+                    decrementLargeLabel={`-${volumeLargeStep}`}
+                    decrementSmallLabel={`-${volumeSmallStep}`}
+                    displayValue={volumeGoalDraftLabel}
+                    incrementLargeLabel={`+${volumeLargeStep}`}
+                    incrementSmallLabel={`+${volumeSmallStep}`}
+                    onDecrementLarge={() =>
+                      onSetVolumeGoalDraft((value) => Math.max(1, value - volumeLargeStep))
+                    }
+                    onDecrementSmall={() =>
+                      onSetVolumeGoalDraft((value) => Math.max(1, value - volumeSmallStep))
+                    }
+                    onIncrementLarge={() =>
+                      onSetVolumeGoalDraft((value) => value + volumeLargeStep)
+                    }
+                    onIncrementSmall={() =>
+                      onSetVolumeGoalDraft((value) => value + volumeSmallStep)
+                    }
+                  />
                 </div>
               </div>
             </div>
@@ -211,37 +231,24 @@ export function ExerciseCardDetails({
 
           <div className="mb-2 flex items-center justify-between">
             <span className="text-[9px] font-black uppercase tracking-widest text-slate-500">
-              {setType === SetType.REPS ? 'Reps' : 'Seconds'}
+              {isTimed ? 'Time' : 'Reps'}
             </span>
-            <div className="flex items-center gap-1 rounded-xl border border-slate-700 bg-[#1A1F26] p-0.5">
-              <button
-                {...getHoldHandlers(-5)}
-                className="w-9 h-7 flex items-center justify-center rounded-lg bg-[#2A333E] text-[10px] font-black text-slate-300"
-              >
-                -5
-              </button>
-              <button
-                {...getHoldHandlers(-1)}
-                className="w-7 h-7 flex items-center justify-center rounded-lg bg-[#2A333E] text-slate-300"
-              >
-                <Minus size={12} />
-              </button>
-              <div className="w-12 text-center font-mono text-sm font-black text-white">
-                {tempValue}
-              </div>
-              <button
-                {...getHoldHandlers(1)}
-                className="w-7 h-7 flex items-center justify-center rounded-lg bg-[#2A333E] text-slate-300"
-              >
-                <Plus size={12} />
-              </button>
-              <button
-                {...getHoldHandlers(5)}
-                className="w-9 h-7 flex items-center justify-center rounded-lg bg-[#2A333E] text-[10px] font-black text-slate-300"
-              >
-                +5
-              </button>
-            </div>
+            <ExerciseCardValueStepper
+              centerWidthClassName="w-20"
+              decrementLargeLabel={`-${largeStep}`}
+              decrementLargeButtonProps={getHoldHandlers(-largeStep)}
+              decrementSmallLabel={`-${smallStep}`}
+              decrementSmallButtonProps={getHoldHandlers(-smallStep)}
+              displayValue={tempValueLabel}
+              incrementLargeLabel={`+${largeStep}`}
+              incrementLargeButtonProps={getHoldHandlers(largeStep)}
+              incrementSmallLabel={`+${smallStep}`}
+              incrementSmallButtonProps={getHoldHandlers(smallStep)}
+              onDecrementLarge={() => undefined}
+              onDecrementSmall={() => undefined}
+              onIncrementLarge={() => undefined}
+              onIncrementSmall={() => undefined}
+            />
           </div>
 
           <div className="mt-2 flex flex-col gap-4">

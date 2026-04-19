@@ -50,10 +50,6 @@ export function ExerciseCardMetaPane({
                     color: isSelected ? '#111827' : '#e2e8f0',
                   }}
                 >
-                  <span
-                    className="inline-block h-2 w-2 rounded-full"
-                    style={{ backgroundColor: category.color }}
-                  />
                   <span>{category.name}</span>
                 </button>
               )
