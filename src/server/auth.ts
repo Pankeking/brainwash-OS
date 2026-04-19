@@ -36,7 +36,7 @@ function generateGitHubOAuthUrl(clientId: string, redirectUri: string, state: st
   const params = new URLSearchParams({
     client_id: clientId,
     redirect_uri: redirectUri,
-    state: state,
+    state,
     scope: 'user:email',
   })
   return `https://github.com/login/oauth/authorize?${params.toString()}`

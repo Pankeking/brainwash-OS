@@ -29,6 +29,16 @@ export default [
       prettier,
     },
     rules: {
+      '@typescript-eslint/consistent-type-imports': 'warn',
+      '@typescript-eslint/no-unused-vars': [
+        'warn',
+        { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
+      ],
+      complexity: ['warn', 40],
+      eqeqeq: ['error', 'always'],
+      'max-lines': ['warn', { max: 700, skipBlankLines: true, skipComments: true }],
+      'no-console': ['warn', { allow: ['warn', 'error'] }],
+      'object-shorthand': 'warn',
       'prettier/prettier': 'warn',
     },
   },

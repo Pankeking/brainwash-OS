@@ -1,112 +1,31 @@
 import { useMemo, useState } from 'react'
 import { createFileRoute, Link } from '@tanstack/react-router'
-import {
-  ChevronLeft,
-  Trash2,
-  History,
-  PlusCircle,
-  X,
-  Check,
-  Tag,
-  Clock3,
-  Dumbbell,
-} from 'lucide-react'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { ChevronLeft } from 'lucide-react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 
-import { WeeklyCalendar, ExerciseActionCard, Chat, WorkoutTimers } from '~/components/components'
-import {
-  addWorkoutCategoryFn,
-  addWorkoutExerciseFn,
-  addWorkoutSetFn,
-  getWorkoutDayFn,
-  getWorkoutWeeklyCategoryStatsFn,
-  removeWorkoutCategoryFn,
-  removeWorkoutExerciseFn,
-  removeWorkoutSetFn,
-  renameWorkoutExerciseFn,
-  toggleWorkoutExerciseCategoryFn,
-  updateWorkoutExerciseWeeklyGoalFn,
-  updateWorkoutCategoryColorFn,
-} from '~/server/workout'
+import { Chat, WeeklyCalendar, WorkoutTimers } from '~/components/components'
 import { SetType } from '~/enums/enums'
+import { dayKeyFromDateInTimeZone } from '~/server/dayKey'
+import { getWorkoutDayFn, getWorkoutWeeklyCategoryStatsFn } from '~/server/workout'
 
-export interface Category {
-  id: string
-  name: string
-  color: string
-}
-
-export interface Exercise {
-  id: string
-  name: string
-  categoryIds: string[]
-  weeklySetGoal: number | null
-  weekSetsDone: number
-  stats: {
-    week: { best: number | null; avg: number | null; worst: number | null }
-    month: { best: number | null; avg: number | null; worst: number | null }
-  }
-}
-
-export interface Log {
-  id: string
-  exerciseId: string
-  exerciseName: string
-  type: SetType
-  value: number
-  date: string
-  timestamp: string
-}
-
-interface WorkoutDayData {
-  categories: Category[]
-  exercises: Exercise[]
-  logs: Log[]
-}
-
-type CategoryColorOption = {
-  name: string
-  hex: string
-}
-
-type WorkoutTab = 'time' | 'categories' | 'exercises' | 'history'
-
-const CATEGORY_COLORS: CategoryColorOption[] = [
-  { name: 'Red', hex: '#EF4444' },
-  { name: 'Orange', hex: '#F97316' },
-  { name: 'Amber', hex: '#F59E0B' },
-  { name: 'Green', hex: '#22C55E' },
-  { name: 'Blue', hex: '#3B82F6' },
-  { name: 'Purple', hex: '#8B5CF6' },
-]
-
-const TIME_ZONE = 'Europe/Berlin'
-
-function toDayKey(date: Date) {
-  const formatter = new Intl.DateTimeFormat('en-CA', {
-    timeZone: TIME_ZONE,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  })
-  const parts = formatter.formatToParts(date)
-  const year = parts.find((part) => part.type === 'year')?.value
-  const month = parts.find((part) => part.type === 'month')?.value
-  const day = parts.find((part) => part.type === 'day')?.value
-  return `${year}-${month}-${day}`
-}
-
-function formatDayKey(dayKey: string) {
-  return new Date(`${dayKey}T12:00:00.000Z`).toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    timeZone: TIME_ZONE,
-  })
-}
+import { WORKOUT_CATEGORY_COLORS, WORKOUT_TIME_ZONE } from '~/features/workout/workout.constants'
+import { formatWorkoutDayLabel } from '~/features/workout/workout.format'
+import { WorkoutCategoriesTab } from '~/features/workout/WorkoutCategoriesTab'
+import { WorkoutExercisesTab } from '~/features/workout/WorkoutExercisesTab'
+import { WorkoutHistoryTab } from '~/features/workout/WorkoutHistoryTab'
+import { WorkoutTabBar } from '~/features/workout/WorkoutTabBar'
+import type {
+  WeeklyCategoryStatsData,
+  WorkoutCategory,
+  WorkoutExercise,
+  WorkoutLog,
+  WorkoutTab,
+} from '~/features/workout/workout.types'
+import { useWorkoutMutations } from '~/features/workout/useWorkoutMutations'
 
 export const Route = createFileRoute('/_authed/workout')({
   loader: async () => {
-    const selectedDay = toDayKey(new Date())
+    const selectedDay = dayKeyFromDateInTimeZone(new Date(), WORKOUT_TIME_ZONE)
     const [workoutDayData, weeklyStatsData] = await Promise.all([
       getWorkoutDayFn({ data: { selectedDay } }),
       getWorkoutWeeklyCategoryStatsFn({ data: { weeks: 4 } }),
@@ -124,36 +43,22 @@ export const Route = createFileRoute('/_authed/workout')({
 function WorkoutView() {
   const loaderData = Route.useLoaderData()
   const queryClient = useQueryClient()
-  const [selectedDay, setSelectedDay] = useState(loaderData.selectedDay)
-  const [isAddingExercise, setIsAddingExercise] = useState(false)
-  const [isAddingCategory, setIsAddingCategory] = useState(false)
-  const [newExerciseName, setNewExerciseName] = useState('')
-  const [newCategoryName, setNewCategoryName] = useState('')
+
+  const [activeTab, setActiveTab] = useState<WorkoutTab>('exercises')
   const [confirmDeleteSetId, setConfirmDeleteSetId] = useState<string | null>(null)
   const [expandedExerciseId, setExpandedExerciseId] = useState<string | null>(null)
-  const [weeksToShow, setWeeksToShow] = useState(4)
-  const [activeTab, setActiveTab] = useState<WorkoutTab>('exercises')
+  const [isAddingCategory, setIsAddingCategory] = useState(false)
+  const [isAddingExercise, setIsAddingExercise] = useState(false)
+  const [newCategoryName, setNewCategoryName] = useState('')
+  const [newExerciseName, setNewExerciseName] = useState('')
+  const [selectedDay, setSelectedDay] = useState(loaderData.selectedDay)
   const [timerAutoStartToken, setTimerAutoStartToken] = useState(0)
+  const [weeksToShow, setWeeksToShow] = useState(4)
 
   const focusRunningStopwatch = () => {
     setActiveTab('time')
     setTimerAutoStartToken((current) => current + 1)
   }
-
-  const refreshWorkoutDay = async (dayKey: string) => {
-    await queryClient.invalidateQueries({
-      queryKey: ['workout-day', dayKey],
-    })
-    await queryClient.refetchQueries({
-      queryKey: ['workout-day', dayKey],
-      type: 'all',
-    })
-  }
-
-  const invalidateWeeklyStats = () =>
-    queryClient.invalidateQueries({
-      queryKey: ['workout-weekly-category-stats', weeksToShow],
-    })
 
   const { data, isLoading } = useQuery({
     queryKey: ['workout-day', selectedDay],
@@ -163,433 +68,57 @@ function WorkoutView() {
     refetchOnWindowFocus: false,
   })
 
-  const { data: weeklyStatsData, isLoading: isWeeklyStatsLoading } = useQuery({
-    queryKey: ['workout-weekly-category-stats', weeksToShow],
-    queryFn: () => getWorkoutWeeklyCategoryStatsFn({ data: { weeks: weeksToShow } }),
-    initialData: weeksToShow === 4 ? loaderData.weeklyStatsData : undefined,
-    staleTime: 30_000,
-    refetchOnWindowFocus: false,
-  })
+  const { data: weeklyStatsData, isLoading: isWeeklyStatsLoading } =
+    useQuery<WeeklyCategoryStatsData>({
+      queryKey: ['workout-weekly-category-stats', weeksToShow],
+      queryFn: () => getWorkoutWeeklyCategoryStatsFn({ data: { weeks: weeksToShow } }),
+      initialData: weeksToShow === 4 ? loaderData.weeklyStatsData : undefined,
+      staleTime: 30_000,
+      refetchOnWindowFocus: false,
+    })
 
-  const categories: Category[] = data?.categories || []
-  const myExercises: Exercise[] = data?.exercises || []
-  const logs: Log[] = data?.logs || []
+  const categories: WorkoutCategory[] = data?.categories || []
+  const exercises: WorkoutExercise[] = data?.exercises || []
+  const logs: WorkoutLog[] = data?.logs || []
 
-  const addCategoryMutation = useMutation({
-    mutationFn: (input: { data: { name: string; color: string } }) => addWorkoutCategoryFn(input),
-    onMutate: async (newCategory) => {
-      const dayKey = selectedDay
-      await queryClient.cancelQueries({ queryKey: ['workout-day', dayKey] })
-      const previousData = queryClient.getQueryData<WorkoutDayData>(['workout-day', dayKey])
-
-      if (previousData) {
-        const tempCategory: Category = {
-          id: `temp-${Date.now()}`,
-          name: newCategory.data.name,
-          color: newCategory.data.color,
-        }
-        queryClient.setQueryData<WorkoutDayData>(['workout-day', dayKey], (old) => {
-          if (!old) return old
-          return {
-            ...old,
-            categories: [...old.categories, tempCategory],
-          }
-        })
-      }
-
-      return { previousData }
-    },
-    onSuccess: async () => {
+  const {
+    addCategoryMutation,
+    addExerciseMutation,
+    addSetMutation,
+    cycleCategoryColor,
+    invalidateWeeklyStats,
+    refreshWorkoutDay,
+    removeCategoryMutation,
+    removeExerciseMutation,
+    removeSetMutation,
+    renameExerciseMutation,
+    toggleExerciseCategoryMutation,
+    updateExerciseWeeklyGoalMutation,
+  } = useWorkoutMutations({
+    onAddedCategory: () => {
       setNewCategoryName('')
       setIsAddingCategory(false)
     },
-    onError: (err, newCategory, context) => {
-      if (context?.previousData) {
-        queryClient.setQueryData(['workout-day', selectedDay], context.previousData)
-      }
-    },
-    onSettled: () => {
-      refreshWorkoutDay(selectedDay)
-    },
-  })
-
-  const removeCategoryMutation = useMutation({
-    mutationFn: (input: { data: { categoryId: string } }) => removeWorkoutCategoryFn(input),
-    onMutate: async (variables) => {
-      const dayKey = selectedDay
-      await queryClient.cancelQueries({ queryKey: ['workout-day', dayKey] })
-      const previousData = queryClient.getQueryData<WorkoutDayData>(['workout-day', dayKey])
-
-      if (previousData) {
-        queryClient.setQueryData<WorkoutDayData>(['workout-day', dayKey], (old) => {
-          if (!old) return old
-          return {
-            ...old,
-            categories: old.categories.filter((cat) => cat.id !== variables.data.categoryId),
-            exercises: old.exercises.map((ex) => ({
-              ...ex,
-              categoryIds: ex.categoryIds.filter((id) => id !== variables.data.categoryId),
-            })),
-          }
-        })
-      }
-
-      return { previousData }
-    },
-    onError: (err, variables, context) => {
-      if (context?.previousData) {
-        queryClient.setQueryData(['workout-day', selectedDay], context.previousData)
-      }
-    },
-    onSettled: () => {
-      refreshWorkoutDay(selectedDay)
-      invalidateWeeklyStats()
-    },
-  })
-
-  const updateCategoryColorMutation = useMutation({
-    mutationFn: (input: { data: { categoryId: string; color: string } }) =>
-      updateWorkoutCategoryColorFn(input),
-    onMutate: async (variables) => {
-      const dayKey = selectedDay
-      await queryClient.cancelQueries({ queryKey: ['workout-day', dayKey] })
-      const previousData = queryClient.getQueryData<WorkoutDayData>(['workout-day', dayKey])
-
-      if (previousData) {
-        queryClient.setQueryData<WorkoutDayData>(['workout-day', dayKey], (old) => {
-          if (!old) return old
-          return {
-            ...old,
-            categories: old.categories.map((cat) =>
-              cat.id === variables.data.categoryId ? { ...cat, color: variables.data.color } : cat,
-            ),
-          }
-        })
-      }
-
-      return { previousData }
-    },
-    onError: (err, variables, context) => {
-      if (context?.previousData) {
-        queryClient.setQueryData(['workout-day', selectedDay], context.previousData)
-      }
-    },
-    onSettled: () => {
-      refreshWorkoutDay(selectedDay)
-      invalidateWeeklyStats()
-    },
-  })
-
-  const addExerciseMutation = useMutation({
-    mutationFn: (input: { data: { selectedDay: string; name: string } }) =>
-      addWorkoutExerciseFn(input),
-    onMutate: async (newExercise) => {
-      const dayKey = newExercise.data.selectedDay
-      await queryClient.cancelQueries({ queryKey: ['workout-day', dayKey] })
-      const previousData = queryClient.getQueryData<WorkoutDayData>(['workout-day', dayKey])
-
-      if (previousData) {
-        const tempExercise: Exercise = {
-          id: `temp-${Date.now()}`,
-          name: newExercise.data.name,
-          categoryIds: [],
-          weeklySetGoal: null,
-          weekSetsDone: 0,
-          stats: {
-            week: { best: null, avg: null, worst: null },
-            month: { best: null, avg: null, worst: null },
-          },
-        }
-        queryClient.setQueryData<WorkoutDayData>(['workout-day', dayKey], (old) => {
-          if (!old) return old
-          return {
-            ...old,
-            exercises: [...old.exercises, tempExercise],
-          }
-        })
-      }
-
-      return { previousData }
-    },
-    onSuccess: async () => {
+    onAddedExercise: () => {
       setNewExerciseName('')
       setIsAddingExercise(false)
     },
-    onError: (err, newExercise, context) => {
-      if (context?.previousData) {
-        queryClient.setQueryData(
-          ['workout-day', newExercise.data.selectedDay],
-          context.previousData,
-        )
-      }
-    },
-    onSettled: (data, error, variables) => {
-      refreshWorkoutDay(variables.data.selectedDay)
-      invalidateWeeklyStats()
-    },
-  })
-
-  const removeExerciseMutation = useMutation({
-    mutationFn: (input: { data: { selectedDay: string; exerciseId: string } }) =>
-      removeWorkoutExerciseFn(input),
-    onMutate: async (variables) => {
-      const dayKey = variables.data.selectedDay
-      await queryClient.cancelQueries({ queryKey: ['workout-day', dayKey] })
-      const previousData = queryClient.getQueryData<WorkoutDayData>(['workout-day', dayKey])
-
-      if (previousData) {
-        queryClient.setQueryData<WorkoutDayData>(['workout-day', dayKey], (old) => {
-          if (!old) return old
-          return {
-            ...old,
-            exercises: old.exercises.filter((ex) => ex.id !== variables.data.exerciseId),
-            logs: old.logs.filter((log) => log.exerciseId !== variables.data.exerciseId),
-          }
-        })
-      }
-
-      return { previousData }
-    },
-    onError: (err, variables, context) => {
-      if (context?.previousData) {
-        queryClient.setQueryData(['workout-day', variables.data.selectedDay], context.previousData)
-      }
-    },
-    onSettled: (data, error, variables) => {
-      refreshWorkoutDay(variables.data.selectedDay)
-      invalidateWeeklyStats()
-    },
-  })
-
-  const renameExerciseMutation = useMutation({
-    mutationFn: (input: { data: { exerciseId: string; nextName: string } }) =>
-      renameWorkoutExerciseFn(input),
-    onMutate: async (variables) => {
-      const dayKey = selectedDay
-      await queryClient.cancelQueries({ queryKey: ['workout-day', dayKey] })
-      const previousData = queryClient.getQueryData<WorkoutDayData>(['workout-day', dayKey])
-
-      if (previousData) {
-        queryClient.setQueryData<WorkoutDayData>(['workout-day', dayKey], (old) => {
-          if (!old) return old
-          return {
-            ...old,
-            exercises: old.exercises.map((ex) =>
-              ex.id === variables.data.exerciseId ? { ...ex, name: variables.data.nextName } : ex,
-            ),
-            logs: old.logs.map((log) =>
-              log.exerciseId === variables.data.exerciseId
-                ? { ...log, exerciseName: variables.data.nextName }
-                : log,
-            ),
-          }
-        })
-      }
-
-      return { previousData }
-    },
-    onError: (err, variables, context) => {
-      if (context?.previousData) {
-        queryClient.setQueryData(['workout-day', selectedDay], context.previousData)
-      }
-    },
-    onSettled: () => {
-      refreshWorkoutDay(selectedDay)
-      invalidateWeeklyStats()
-    },
-  })
-
-  const toggleExerciseCategoryMutation = useMutation({
-    mutationFn: (input: { data: { exerciseId: string; categoryId: string } }) =>
-      toggleWorkoutExerciseCategoryFn(input),
-    onMutate: async (variables) => {
-      const dayKey = selectedDay
-      await queryClient.cancelQueries({ queryKey: ['workout-day', dayKey] })
-      const previousData = queryClient.getQueryData<WorkoutDayData>(['workout-day', dayKey])
-
-      if (previousData) {
-        queryClient.setQueryData<WorkoutDayData>(['workout-day', dayKey], (old) => {
-          if (!old) return old
-          return {
-            ...old,
-            exercises: old.exercises.map((ex) => {
-              if (ex.id === variables.data.exerciseId) {
-                const categoryIds = ex.categoryIds.includes(variables.data.categoryId)
-                  ? ex.categoryIds.filter((id) => id !== variables.data.categoryId)
-                  : [...ex.categoryIds, variables.data.categoryId]
-                return { ...ex, categoryIds }
-              }
-              return ex
-            }),
-          }
-        })
-      }
-
-      return { previousData }
-    },
-    onError: (err, variables, context) => {
-      if (context?.previousData) {
-        queryClient.setQueryData(['workout-day', selectedDay], context.previousData)
-      }
-    },
-    onSettled: () => {
-      refreshWorkoutDay(selectedDay)
-      invalidateWeeklyStats()
-    },
-  })
-
-  const updateExerciseWeeklyGoalMutation = useMutation({
-    mutationFn: (input: { data: { exerciseId: string; weeklySetGoal: number | null } }) =>
-      updateWorkoutExerciseWeeklyGoalFn(input),
-    onMutate: async (variables) => {
-      const dayKey = selectedDay
-      await queryClient.cancelQueries({ queryKey: ['workout-day', dayKey] })
-      const previousData = queryClient.getQueryData<WorkoutDayData>(['workout-day', dayKey])
-
-      if (previousData) {
-        queryClient.setQueryData<WorkoutDayData>(['workout-day', dayKey], (old) => {
-          if (!old) return old
-          return {
-            ...old,
-            exercises: old.exercises.map((ex) =>
-              ex.id === variables.data.exerciseId
-                ? { ...ex, weeklySetGoal: variables.data.weeklySetGoal }
-                : ex,
-            ),
-          }
-        })
-      }
-
-      return { previousData }
-    },
-    onError: (err, variables, context) => {
-      if (context?.previousData) {
-        queryClient.setQueryData(['workout-day', selectedDay], context.previousData)
-      }
-    },
-    onSettled: () => {
-      refreshWorkoutDay(selectedDay)
-      invalidateWeeklyStats()
-    },
-  })
-
-  const addSetMutation = useMutation({
-    mutationFn: (input: {
-      data: {
-        selectedDay: string
-        exerciseId: string
-        type: SetType
-        reps?: number
-        duration?: number
-      }
-    }) => addWorkoutSetFn(input),
-    onMutate: async (newSet) => {
-      const dayKey = newSet.data.selectedDay
-      await queryClient.cancelQueries({ queryKey: ['workout-day', dayKey] })
-      const previousData = queryClient.getQueryData<WorkoutDayData>(['workout-day', dayKey])
-
-      if (previousData) {
-        const exercise = previousData.exercises.find((ex) => ex.id === newSet.data.exerciseId)
-        const exerciseName = exercise?.name || 'Unknown'
-
-        const value = newSet.data.type === SetType.REPS ? newSet.data.reps : newSet.data.duration
-        const newLog: Log = {
-          id: `temp-${Date.now()}`,
-          exerciseId: newSet.data.exerciseId,
-          exerciseName,
-          type: newSet.data.type,
-          value: value || 0,
-          date: dayKey,
-          timestamp: new Date().toISOString(),
-        }
-
-        queryClient.setQueryData<WorkoutDayData>(['workout-day', dayKey], (old) => {
-          if (!old) return old
-          return {
-            ...old,
-            exercises: old.exercises.map((ex) =>
-              ex.id === newSet.data.exerciseId ? { ...ex, weekSetsDone: ex.weekSetsDone + 1 } : ex,
-            ),
-            logs: [...old.logs, newLog],
-          }
-        })
-      }
-
-      return { previousData }
-    },
-    onSuccess: () => {
-      focusRunningStopwatch()
-    },
-    onError: (err, newSet, context) => {
-      if (context?.previousData) {
-        queryClient.setQueryData(['workout-day', newSet.data.selectedDay], context.previousData)
-      }
-    },
-    onSettled: (data, error, variables) => {
-      refreshWorkoutDay(variables.data.selectedDay)
-      invalidateWeeklyStats()
-    },
-  })
-
-  const removeSetMutation = useMutation({
-    mutationFn: (input: { data: { selectedDay: string; logId: string } }) =>
-      removeWorkoutSetFn(input),
-    onMutate: async (variables) => {
-      const dayKey = variables.data.selectedDay
-      await queryClient.cancelQueries({ queryKey: ['workout-day', dayKey] })
-      const previousData = queryClient.getQueryData<WorkoutDayData>(['workout-day', dayKey])
-
-      if (previousData) {
-        const logToRemove = previousData.logs.find((log) => log.id === variables.data.logId)
-        if (logToRemove) {
-          queryClient.setQueryData<WorkoutDayData>(['workout-day', dayKey], (old) => {
-            if (!old) return old
-            return {
-              ...old,
-              exercises: old.exercises.map((ex) =>
-                ex.id === logToRemove.exerciseId
-                  ? { ...ex, weekSetsDone: Math.max(0, ex.weekSetsDone - 1) }
-                  : ex,
-              ),
-              logs: old.logs.filter((log) => log.id !== variables.data.logId),
-            }
-          })
-        }
-      }
-
-      return { previousData }
-    },
-    onError: (err, variables, context) => {
-      if (context?.previousData) {
-        queryClient.setQueryData(['workout-day', variables.data.selectedDay], context.previousData)
-      }
-    },
-    onSettled: (data, error, variables) => {
+    onRemovedSet: () => {
       setConfirmDeleteSetId(null)
-      refreshWorkoutDay(variables.data.selectedDay)
-      invalidateWeeklyStats()
     },
+    onStartStopwatch: focusRunningStopwatch,
+    queryClient,
+    selectedDay,
+    weeksToShow,
   })
-
-  const handleAddExercise = () => {
-    const trimmedName = newExerciseName.trim()
-    if (!trimmedName) {
-      return
-    }
-    addExerciseMutation.mutate({
-      data: {
-        selectedDay,
-        name: trimmedName,
-      },
-    })
-  }
 
   const handleAddCategory = () => {
     const trimmedName = newCategoryName.trim()
     if (!trimmedName) {
       return
     }
-    const color = CATEGORY_COLORS[categories.length % CATEGORY_COLORS.length].hex
+
+    const color = WORKOUT_CATEGORY_COLORS[categories.length % WORKOUT_CATEGORY_COLORS.length].hex
     addCategoryMutation.mutate({
       data: {
         name: trimmedName,
@@ -598,7 +127,21 @@ function WorkoutView() {
     })
   }
 
-  const addSet = (exercise: Exercise, payload: { type: SetType; value: number }) => {
+  const handleAddExercise = () => {
+    const trimmedName = newExerciseName.trim()
+    if (!trimmedName) {
+      return
+    }
+
+    addExerciseMutation.mutate({
+      data: {
+        selectedDay,
+        name: trimmedName,
+      },
+    })
+  }
+
+  const handleAddSet = (exercise: WorkoutExercise, payload: { type: SetType; value: number }) => {
     addSetMutation.mutate({
       data: {
         selectedDay,
@@ -610,60 +153,44 @@ function WorkoutView() {
     })
   }
 
-  const removeExercise = (exerciseId: string) => {
-    removeExerciseMutation.mutate({
-      data: {
-        selectedDay,
-        exerciseId,
-      },
-    })
-  }
-
-  const cycleCategoryColor = (category: Category) => {
-    const currentIndex = CATEGORY_COLORS.findIndex((value) => value.hex === category.color)
-    const nextColor = CATEGORY_COLORS[(currentIndex + 1) % CATEGORY_COLORS.length]
-    updateCategoryColorMutation.mutate({
-      data: {
-        categoryId: category.id,
-        color: nextColor.hex,
-      },
-    })
-  }
-
   const handleAssistantWorkoutChanged = (nextSelectedDay: string) => {
     setSelectedDay(nextSelectedDay)
     focusRunningStopwatch()
     void refreshWorkoutDay(nextSelectedDay)
-    invalidateWeeklyStats()
+    void invalidateWeeklyStats()
   }
 
   const filteredLogs = useMemo(() => logs.slice().reverse(), [logs])
-  const logCountByExercise = useMemo(() => {
-    const map = new Map<string, number>()
-    filteredLogs.forEach((log) => {
-      map.set(log.exerciseId, (map.get(log.exerciseId) || 0) + 1)
-    })
-    return map
-  }, [filteredLogs])
-  const latestLogTimestampByExercise = useMemo(() => {
-    const map = new Map<string, number>()
-    logs.forEach((log) => {
-      const timestamp = new Date(log.timestamp).getTime()
-      const previousTimestamp = map.get(log.exerciseId) || 0
-      if (timestamp > previousTimestamp) {
-        map.set(log.exerciseId, timestamp)
-      }
-    })
-    return map
-  }, [logs])
-  const sortedExercises = useMemo(() => {
-    const hasGoal = (exercise: Exercise) =>
-      exercise.weeklySetGoal !== null && exercise.weeklySetGoal > 0
-    const isGoalCompleted = (exercise: Exercise) =>
-      hasGoal(exercise) && exercise.weekSetsDone >= (exercise.weeklySetGoal || 0)
-    const isBottomPriority = (exercise: Exercise) => !hasGoal(exercise) || isGoalCompleted(exercise)
 
-    return myExercises.slice().sort((left, right) => {
+  const logCountByExercise = useMemo(() => {
+    const counts = new Map<string, number>()
+    for (const log of filteredLogs) {
+      counts.set(log.exerciseId, (counts.get(log.exerciseId) || 0) + 1)
+    }
+    return counts
+  }, [filteredLogs])
+
+  const latestLogTimestampByExercise = useMemo(() => {
+    const timestamps = new Map<string, number>()
+    for (const log of logs) {
+      const timestamp = new Date(log.timestamp).getTime()
+      const previousTimestamp = timestamps.get(log.exerciseId) || 0
+      if (timestamp > previousTimestamp) {
+        timestamps.set(log.exerciseId, timestamp)
+      }
+    }
+    return timestamps
+  }, [logs])
+
+  const sortedExercises = useMemo(() => {
+    const hasGoal = (exercise: WorkoutExercise) =>
+      exercise.weeklySetGoal !== null && exercise.weeklySetGoal > 0
+    const isGoalCompleted = (exercise: WorkoutExercise) =>
+      hasGoal(exercise) && exercise.weekSetsDone >= (exercise.weeklySetGoal || 0)
+    const isBottomPriority = (exercise: WorkoutExercise) =>
+      !hasGoal(exercise) || isGoalCompleted(exercise)
+
+    return exercises.slice().sort((left, right) => {
       const leftBottomPriority = isBottomPriority(left)
       const rightBottomPriority = isBottomPriority(right)
       if (leftBottomPriority !== rightBottomPriority) {
@@ -678,7 +205,7 @@ function WorkoutView() {
 
       return left.name.localeCompare(right.name)
     })
-  }, [myExercises, latestLogTimestampByExercise])
+  }, [exercises, latestLogTimestampByExercise])
 
   return (
     <div className="min-h-screen bg-[#1A1F26] text-slate-100 p-5 font-sans pb-32">
@@ -687,83 +214,12 @@ function WorkoutView() {
           <ChevronLeft size={24} />
         </Link>
         <div className="bg-[#2A333E] px-3 py-1 rounded-md text-[10px] font-black tracking-widest border border-slate-700 uppercase text-slate-400">
-          {formatDayKey(selectedDay)}
+          {formatWorkoutDayLabel(selectedDay)}
         </div>
       </header>
 
       <WeeklyCalendar selectedDay={selectedDay} onSelectDay={setSelectedDay} />
-      <div className="mb-6 px-1">
-        <div className="flex items-center gap-2 bg-[#2A333E] rounded-2xl p-1.5 border border-slate-700 shadow-[0_12px_30px_rgba(0,0,0,0.2)] overflow-hidden">
-          <button
-            onClick={() => setActiveTab('time')}
-            className={`h-11 rounded-xl text-[9px] font-black uppercase tracking-widest flex items-center justify-center transition-all duration-300 ${
-              activeTab === 'time'
-                ? 'bg-orange-500 text-white shadow-[0_8px_20px_rgba(249,115,22,0.35)] flex-[2.2] px-3 gap-1.5'
-                : 'text-slate-400 hover:bg-[#364252] hover:text-slate-200 w-11 flex-none px-0'
-            }`}
-          >
-            <Clock3 size={12} />
-            <span
-              className={`transition-all duration-300 whitespace-nowrap overflow-hidden ${
-                activeTab === 'time' ? 'max-w-[140px] opacity-100' : 'max-w-0 opacity-0'
-              }`}
-            >
-              Time
-            </span>
-          </button>
-          <button
-            onClick={() => setActiveTab('categories')}
-            className={`h-11 rounded-xl text-[9px] font-black uppercase tracking-widest flex items-center justify-center transition-all duration-300 ${
-              activeTab === 'categories'
-                ? 'bg-orange-500 text-white shadow-[0_8px_20px_rgba(249,115,22,0.35)] flex-[2.2] px-3 gap-1.5'
-                : 'text-slate-400 hover:bg-[#364252] hover:text-slate-200 w-11 flex-none px-0'
-            }`}
-          >
-            <Tag size={12} />
-            <span
-              className={`transition-all duration-300 whitespace-nowrap overflow-hidden ${
-                activeTab === 'categories' ? 'max-w-[140px] opacity-100' : 'max-w-0 opacity-0'
-              }`}
-            >
-              Categories
-            </span>
-          </button>
-          <button
-            onClick={() => setActiveTab('exercises')}
-            className={`h-11 rounded-xl text-[9px] font-black uppercase tracking-widest flex items-center justify-center transition-all duration-300 ${
-              activeTab === 'exercises'
-                ? 'bg-orange-500 text-white shadow-[0_8px_20px_rgba(249,115,22,0.35)] flex-[2.2] px-3 gap-1.5'
-                : 'text-slate-400 hover:bg-[#364252] hover:text-slate-200 w-11 flex-none px-0'
-            }`}
-          >
-            <Dumbbell size={12} />
-            <span
-              className={`transition-all duration-300 whitespace-nowrap overflow-hidden ${
-                activeTab === 'exercises' ? 'max-w-[140px] opacity-100' : 'max-w-0 opacity-0'
-              }`}
-            >
-              Exercises
-            </span>
-          </button>
-          <button
-            onClick={() => setActiveTab('history')}
-            className={`h-11 rounded-xl text-[9px] font-black uppercase tracking-widest flex items-center justify-center transition-all duration-300 ${
-              activeTab === 'history'
-                ? 'bg-orange-500 text-white shadow-[0_8px_20px_rgba(249,115,22,0.35)] flex-[2.2] px-3 gap-1.5'
-                : 'text-slate-400 hover:bg-[#364252] hover:text-slate-200 w-11 flex-none px-0'
-            }`}
-          >
-            <History size={12} />
-            <span
-              className={`transition-all duration-300 whitespace-nowrap overflow-hidden ${
-                activeTab === 'history' ? 'max-w-[140px] opacity-100' : 'max-w-0 opacity-0'
-              }`}
-            >
-              History
-            </span>
-          </button>
-        </div>
-      </div>
+      <WorkoutTabBar activeTab={activeTab} onChange={setActiveTab} />
 
       {isLoading ? (
         <div className="text-slate-400 text-center py-10 text-sm">Loading workout data...</div>
@@ -774,317 +230,89 @@ function WorkoutView() {
           </div>
 
           {activeTab === 'categories' && (
-            <>
-              <div className="mb-8">
-                <div className="flex justify-between items-center mb-3 px-1">
-                  <h2 className="text-[10px] font-black tracking-[0.2em] text-slate-500 uppercase flex items-center gap-2">
-                    <Tag size={12} className="text-orange-500" /> Categories
-                  </h2>
-                  <button
-                    onClick={() => setIsAddingCategory(!isAddingCategory)}
-                    className="text-orange-500 text-[9px] font-black uppercase tracking-widest"
-                  >
-                    {isAddingCategory ? 'Cancel' : '+ New Category'}
-                  </button>
-                </div>
-
-                {isAddingCategory && (
-                  <div className="mb-4 animate-in zoom-in-95 duration-200">
-                    <div className="bg-[#2A333E] p-2 rounded-xl border border-orange-500/30 flex items-center gap-2">
-                      <input
-                        autoFocus
-                        placeholder="e.g. Upper Body"
-                        className="bg-transparent border-none focus:ring-0 text-[16px] md:text-xs font-bold text-white flex-1"
-                        value={newCategoryName}
-                        onChange={(e) => setNewCategoryName(e.target.value)}
-                        onKeyDown={(e) => e.key === 'Enter' && handleAddCategory()}
-                      />
-                      <button
-                        onClick={handleAddCategory}
-                        className="p-1.5 bg-orange-500 rounded-lg"
-                      >
-                        <Check size={14} />
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {categories.length === 0 ? (
-                  <div className="px-1 py-4 border border-dashed border-slate-800 rounded-xl text-center">
-                    <p className="text-[8px] font-black uppercase text-slate-600 tracking-tighter">
-                      No categories created yet
-                    </p>
-                  </div>
-                ) : (
-                  <div className="flex flex-wrap gap-2 px-1">
-                    {categories.map((cat) => (
-                      <div
-                        key={cat.id}
-                        className="flex items-center gap-1.5 bg-[#2A333E] px-2 py-1 rounded-lg border border-slate-700 cursor-pointer"
-                        onClick={() => cycleCategoryColor(cat)}
-                        title={`Color: ${CATEGORY_COLORS.find((value) => value.hex === cat.color)?.name || 'Custom'}`}
-                      >
-                        <div
-                          className="w-2 h-2 rounded-full"
-                          style={{ backgroundColor: cat.color }}
-                        />
-                        <span className="text-[10px] font-bold text-slate-300">{cat.name}</span>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            removeCategoryMutation.mutate({
-                              data: {
-                                categoryId: cat.id,
-                              },
-                            })
-                          }}
-                          className="ml-1 text-slate-600 hover:text-red-500"
-                        >
-                          <X size={10} />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              <div className="mt-10">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-2 text-slate-600">
-                    <Tag size={12} />
-                    <h3 className="text-[10px] font-black uppercase tracking-widest">
-                      Weekly Category Sets
-                    </h3>
-                  </div>
-                  <button
-                    onClick={() => setWeeksToShow((prev) => prev + 4)}
-                    className="text-[9px] font-black uppercase tracking-widest text-orange-400"
-                  >
-                    Load More Weeks
-                  </button>
-                </div>
-
-                <div className="overflow-x-auto border border-slate-800 rounded-xl">
-                  {isWeeklyStatsLoading ? (
-                    <div className="p-4 text-[10px] text-slate-400">
-                      Loading weekly category stats...
-                    </div>
-                  ) : (
-                    <table className="min-w-full text-[10px]">
-                      <thead>
-                        <tr className="bg-[#232a33]">
-                          <th className="text-left px-3 py-2 text-slate-400 uppercase tracking-widest">
-                            Category
-                          </th>
-                          {(weeklyStatsData?.weeks || []).map((week) => (
-                            <th
-                              key={week}
-                              className="px-3 py-2 text-slate-400 uppercase tracking-widest whitespace-nowrap"
-                            >
-                              {week}
-                            </th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {(weeklyStatsData?.rows || []).map((row) => (
-                          <tr key={row.categoryId} className="border-t border-slate-800">
-                            <td className="px-3 py-2 whitespace-nowrap">
-                              <div className="flex items-center gap-2">
-                                <span
-                                  className="inline-block w-2 h-2 rounded-full"
-                                  style={{ backgroundColor: row.color }}
-                                />
-                                <span className="text-slate-200 font-bold">{row.name}</span>
-                              </div>
-                            </td>
-                            {row.counts.map((count, index) => (
-                              <td
-                                key={`${row.categoryId}-${index}`}
-                                className="px-3 py-2 text-center text-slate-300"
-                              >
-                                {count}
-                              </td>
-                            ))}
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  )}
-                </div>
-              </div>
-            </>
+            <WorkoutCategoriesTab
+              categories={categories}
+              isAddingCategory={isAddingCategory}
+              isWeeklyStatsLoading={isWeeklyStatsLoading}
+              newCategoryName={newCategoryName}
+              onAddCategory={handleAddCategory}
+              onCycleCategoryColor={cycleCategoryColor}
+              onRemoveCategory={(categoryId) =>
+                removeCategoryMutation.mutate({
+                  data: {
+                    categoryId,
+                  },
+                })
+              }
+              onSetIsAddingCategory={setIsAddingCategory}
+              onSetNewCategoryName={setNewCategoryName}
+              onShowMoreWeeks={() => setWeeksToShow((current) => current + 4)}
+              weeklyStatsData={weeklyStatsData}
+            />
           )}
 
           {activeTab === 'exercises' && (
-            <>
-              <div className="flex justify-between items-center mb-4 px-1">
-                <h2 className="text-[10px] font-black tracking-[0.2em] text-slate-500 uppercase flex items-center gap-2">
-                  <div className="w-1.5 h-1.5 bg-orange-500 rounded-full" /> Exercises
-                </h2>
-                <button
-                  onClick={() => setIsAddingExercise(true)}
-                  className="flex items-center gap-1.5 bg-[#2A333E] px-2.5 py-1 rounded-lg border border-slate-700 text-orange-500"
-                >
-                  <PlusCircle size={12} />
-                  <span className="text-[9px] font-black uppercase tracking-widest">Add New</span>
-                </button>
-              </div>
-
-              {isAddingExercise && (
-                <div className="mb-4 animate-in zoom-in-95 duration-200">
-                  <div className="bg-[#2A333E] p-3 rounded-2xl border border-orange-500/30 flex items-center gap-2">
-                    <input
-                      autoFocus
-                      placeholder="Exercise name..."
-                      className="bg-transparent border-none focus:ring-0 text-[16px] md:text-sm font-bold text-white flex-1"
-                      value={newExerciseName}
-                      onChange={(e) => setNewExerciseName(e.target.value)}
-                      onKeyDown={(e) => e.key === 'Enter' && handleAddExercise()}
-                    />
-                    <button onClick={() => setIsAddingExercise(false)}>
-                      <X size={18} className="text-slate-500" />
-                    </button>
-                    <button onClick={handleAddExercise} className="p-1.5 bg-orange-500 rounded-lg">
-                      <Check size={18} />
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              <div className="grid grid-cols-1 gap-3">
-                {myExercises.length === 0 && !isAddingExercise && (
-                  <div className="text-center py-12 border-2 border-dashed border-slate-800 rounded-3xl">
-                    <p className="text-[10px] font-black uppercase text-slate-600 tracking-widest">
-                      Your exercise bank is empty
-                    </p>
-                  </div>
-                )}
-                {sortedExercises.map((ex) => (
-                  <ExerciseActionCard
-                    key={ex.id}
-                    id={ex.id}
-                    name={ex.name}
-                    categoryIds={ex.categoryIds}
-                    allCategories={categories}
-                    onAdd={(payload) => addSet(ex, payload)}
-                    onRemove={() => removeExercise(ex.id)}
-                    onRename={(newName) =>
-                      renameExerciseMutation.mutate({
-                        data: {
-                          exerciseId: ex.id,
-                          nextName: newName,
-                        },
-                      })
-                    }
-                    onToggleCategory={(catId) =>
-                      toggleExerciseCategoryMutation.mutate({
-                        data: {
-                          exerciseId: ex.id,
-                          categoryId: catId,
-                        },
-                      })
-                    }
-                    onUpdateWeeklyGoal={(weeklySetGoal) =>
-                      updateExerciseWeeklyGoalMutation.mutate({
-                        data: {
-                          exerciseId: ex.id,
-                          weeklySetGoal,
-                        },
-                      })
-                    }
-                    onToggleExpand={(id) =>
-                      setExpandedExerciseId((prev) => (prev === id ? null : id))
-                    }
-                    isExpanded={expandedExerciseId === ex.id}
-                    count={logCountByExercise.get(ex.id) || 0}
-                    weeklySetGoal={ex.weeklySetGoal}
-                    weekSetsDone={ex.weekSetsDone}
-                    stats={ex.stats}
-                  />
-                ))}
-              </div>
-            </>
+            <WorkoutExercisesTab
+              categories={categories}
+              expandedExerciseId={expandedExerciseId}
+              isAddingExercise={isAddingExercise}
+              logCountByExercise={logCountByExercise}
+              newExerciseName={newExerciseName}
+              onAddExercise={handleAddExercise}
+              onAddSet={handleAddSet}
+              onRemoveExercise={(exerciseId) =>
+                removeExerciseMutation.mutate({
+                  data: {
+                    selectedDay,
+                    exerciseId,
+                  },
+                })
+              }
+              onRenameExercise={(exerciseId, nextName) =>
+                renameExerciseMutation.mutate({
+                  data: {
+                    exerciseId,
+                    nextName,
+                  },
+                })
+              }
+              onSetExpandedExerciseId={setExpandedExerciseId}
+              onSetIsAddingExercise={setIsAddingExercise}
+              onSetNewExerciseName={setNewExerciseName}
+              onToggleExerciseCategory={(exerciseId, categoryId) =>
+                toggleExerciseCategoryMutation.mutate({
+                  data: {
+                    exerciseId,
+                    categoryId,
+                  },
+                })
+              }
+              onUpdateExerciseWeeklyGoal={(exerciseId, weeklySetGoal) =>
+                updateExerciseWeeklyGoalMutation.mutate({
+                  data: {
+                    exerciseId,
+                    weeklySetGoal,
+                  },
+                })
+              }
+              sortedExercises={sortedExercises}
+            />
           )}
 
           {activeTab === 'history' && (
-            <div>
-              <div className="flex items-center gap-2 mb-4 text-slate-600">
-                <History size={12} />
-                <h3 className="text-[10px] font-black uppercase tracking-widest">History</h3>
-              </div>
-              {filteredLogs.length === 0 ? (
-                <div className="border border-dashed border-slate-800 rounded-xl p-4 text-center text-[10px] text-slate-500 uppercase font-black tracking-widest">
-                  No logs for selected day
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {filteredLogs.map((log) => (
-                    <div
-                      key={log.id}
-                      className="bg-[#232a33]/40 p-3 rounded-xl flex justify-between items-center border border-slate-700/20"
-                    >
-                      {confirmDeleteSetId === log.id ? (
-                        <div className="flex-1 flex items-center justify-between px-2">
-                          <span className="text-[10px] font-black text-red-500 uppercase tracking-widest">
-                            Delete?
-                          </span>
-                          <div className="flex gap-2">
-                            <button
-                              onClick={() => setConfirmDeleteSetId(null)}
-                              className="text-[9px] font-black text-slate-500 uppercase"
-                            >
-                              No
-                            </button>
-                            <button
-                              onClick={() => {
-                                removeSetMutation.mutate({
-                                  data: {
-                                    selectedDay,
-                                    logId: log.id,
-                                  },
-                                })
-                              }}
-                              className="text-[9px] font-black text-red-500 uppercase underline"
-                            >
-                              Yes
-                            </button>
-                          </div>
-                        </div>
-                      ) : (
-                        <>
-                          <div className="flex flex-col">
-                            <span className="font-bold text-slate-300 text-sm">
-                              {log.exerciseName}
-                            </span>
-                            <span className="text-[9px] text-slate-500 font-bold uppercase tracking-tighter">
-                              {new Date(log.timestamp).toLocaleTimeString([], {
-                                hour: '2-digit',
-                                minute: '2-digit',
-                              })}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-3">
-                            <div className="bg-[#1A1F26] px-3 py-1 rounded-lg border border-slate-800 text-orange-400 font-mono text-xs font-black">
-                              {log.value}{' '}
-                              <span className="text-[8px] text-slate-600 ml-0.5">
-                                {log.type === SetType.REPS ? 'REPS' : 'SEC'}
-                              </span>
-                            </div>
-                            <button
-                              onClick={() => setConfirmDeleteSetId(log.id)}
-                              className="p-1.5 text-slate-700 hover:text-red-500"
-                            >
-                              <Trash2 size={14} />
-                            </button>
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+            <WorkoutHistoryTab
+              confirmDeleteSetId={confirmDeleteSetId}
+              logs={filteredLogs}
+              onConfirmDeleteSetId={setConfirmDeleteSetId}
+              onRemoveSet={(logId) =>
+                removeSetMutation.mutate({
+                  data: {
+                    selectedDay,
+                    logId,
+                  },
+                })
+              }
+            />
           )}
         </section>
       )}

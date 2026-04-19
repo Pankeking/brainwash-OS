@@ -9,7 +9,7 @@ export const SetLogSchema = new mongoose.Schema(
       type: Number,
       min: 1,
       validate: {
-        validator: function (value: unknown): boolean {
+        validator(value: unknown): boolean {
           if (this.type !== SetType.REPS) {
             return value === undefined || value === null
           }
@@ -22,7 +22,7 @@ export const SetLogSchema = new mongoose.Schema(
       type: Number,
       min: 1,
       validate: {
-        validator: function (value: unknown): boolean {
+        validator(value: unknown): boolean {
           if (this.type !== SetType.TIMED) {
             return value === undefined || value === null
           }

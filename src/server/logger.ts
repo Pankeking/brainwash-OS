@@ -88,7 +88,7 @@ function emit(payload: LogPayload) {
     console.warn(line)
     return
   }
-  console.log(line)
+  process.stdout.write(`${line}\n`)
 }
 
 export function appLogInfo(code: string, message: string, context?: Record<string, unknown>) {

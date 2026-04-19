@@ -11,9 +11,10 @@
     "start": "node .output/server/index.mjs",
     "test": "pnpm exec tsc -p tsconfig.test.json && node --test .test-dist/tests/**/*.test.js",
     "lint": "eslint .",
-    "lint:fix": "eslint . --fix",
+    "lint:fix": "eslint . --fix && prettier . --write",
     "format": "prettier . --write",
-    "fix": "pnpm lint:fix && pnpm format"
+    "format:check": "prettier . --check",
+    "fix": "pnpm lint:fix"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.90.0",
