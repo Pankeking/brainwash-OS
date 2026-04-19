@@ -2,6 +2,8 @@
 
 Workout-first TanStack Start app with GitHub auth, MongoDB persistence, voice transcription, and an assistant flow for logging sets.
 
+Engineering/editing rules for humans and LLMs live in [AGENTS.md](./AGENTS.md).
+
 ## Stack
 
 - React 19
@@ -16,6 +18,8 @@ Workout-first TanStack Start app with GitHub auth, MongoDB persistence, voice tr
 - `dayKey` is a stable calendar date string in `YYYY-MM-DD` format using the app timezone (`Europe/Berlin`).
 - Individual sets still keep precise timestamps in `loggedAt`.
 - Assistant actions should respect `context.selectedDay` when present.
+- User-owned domain records must not be hardcoded in source files. Persist them or infer them from persisted user data.
+- User-facing decimal input should accept both `,` and `.` separators through shared parsing utilities.
 
 ## Scripts
 

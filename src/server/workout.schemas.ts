@@ -1,6 +1,7 @@
 import { z } from 'zod'
 
 import { SetType } from '~/enums/enums'
+import { parseLocaleNumberInput } from '~/lib/number-input'
 
 export const workoutDayInputSchema = z.object({
   selectedDay: z.string(),
@@ -67,7 +68,12 @@ export const weeklyCategoryStatsInputSchema = z.object({
 export const bodyMetricInputSchema = z.object({
   selectedDay: z.string(),
   metricKey: z.string().min(1).max(64),
-  value: z.number().positive().max(9999),
+  value: z
+    .union([z.number(), z.string().min(1).max(32)])
+    .transform((value) => parseLocaleNumberInput(value))
+    .refine((value) => value !== null && value > 0 && value <= 9999, {
+      message: 'Invalid body metric value',
+    }),
 })
 
 export const createBodyMetricDefinitionInputSchema = z.object({

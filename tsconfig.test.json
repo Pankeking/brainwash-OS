@@ -5,5 +5,5 @@
     "outDir": ".test-dist",
     "rootDir": "."
   },
-  "include": ["src/server/dayKey.ts", "tests/**/*.ts"]
+  "include": ["src/server/dayKey.ts", "src/lib/number-input.ts", "tests/**/*.ts"]
 }

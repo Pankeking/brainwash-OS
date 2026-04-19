@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { SetType } from '~/enums/enums'
+import { parseLocaleNumberInput } from '~/lib/number-input'
 import {
   getBodyMetricsDayFn,
   getWorkoutDayFn,
@@ -180,8 +181,8 @@ export function useWorkoutPageController(loaderData: WorkoutLoaderData) {
   }
 
   const handleSaveMetric = (metricKey: string) => {
-    const value = Number(metricDrafts[metricKey])
-    if (!Number.isFinite(value) || value <= 0) {
+    const value = parseLocaleNumberInput(metricDrafts[metricKey] || '')
+    if (value === null || !Number.isFinite(value) || value <= 0) {
       setNotice({
         message: 'Enter a valid body metric value first.',
         tone: 'error',

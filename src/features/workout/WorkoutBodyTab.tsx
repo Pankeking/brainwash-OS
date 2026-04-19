@@ -1,5 +1,7 @@
 import { Check, PlusCircle, Ruler, Trash2, Weight } from 'lucide-react'
 
+import { formatMetricValue } from '~/lib/number-input'
+
 import type { BodyMetricDefinition, BodyMetricEntry, BodyMetricLatestValue } from './workout.types'
 
 interface WorkoutBodyTabProps {
@@ -54,7 +56,7 @@ export function WorkoutBodyTab({
           {latestValue && (
             <div className="text-right">
               <div className="text-sm font-black text-orange-300">
-                {latestValue.value} {latestValue.unit}
+                {formatMetricValue(latestValue.value)} {latestValue.unit}
               </div>
               <div className="text-[8px] font-black uppercase tracking-widest text-slate-500">
                 Latest
@@ -186,7 +188,7 @@ export function WorkoutBodyTab({
                 </div>
                 <div className="flex items-center gap-3">
                   <div className="rounded-lg border border-slate-800 bg-[#1A1F26] px-3 py-1 text-sm font-black text-orange-300">
-                    {entry.value} {entry.unit}
+                    {formatMetricValue(entry.value)} {entry.unit}
                   </div>
                   <button
                     onClick={() => onRemoveEntry(entry.id)}
