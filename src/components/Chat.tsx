@@ -129,6 +129,9 @@ export default function Chat({ context, onWorkoutDataChanged }: ChatProps) {
     mutationFn: (payload: { message: string; context?: ChatProps['context'] }) =>
       assistantChatFn({ data: payload }),
     onSuccess: (data) => {
+      if (!data) {
+        return
+      }
       appendMessage({
         id: `assistant-${Date.now()}`,
         role: 'assistant',
@@ -139,8 +142,8 @@ export default function Chat({ context, onWorkoutDataChanged }: ChatProps) {
         suggestionsUsed: false,
       })
 
-      if (data.didLogSet && data.selectedDay && onWorkoutDataChanged) {
-        onWorkoutDataChanged(data.selectedDay)
+      if (data.selectedDay && data.changeKind && onWorkoutDataChanged) {
+        onWorkoutDataChanged(data.selectedDay, data.changeKind)
       }
     },
   })
@@ -189,6 +192,9 @@ export default function Chat({ context, onWorkoutDataChanged }: ChatProps) {
         },
       }),
     onSuccess: (data) => {
+      if (!data) {
+        return
+      }
       appendMessage({
         id: `assistant-${Date.now()}`,
         role: 'assistant',
@@ -199,8 +205,8 @@ export default function Chat({ context, onWorkoutDataChanged }: ChatProps) {
         suggestionsUsed: false,
       })
 
-      if (data.didLogSet && data.selectedDay && onWorkoutDataChanged) {
-        onWorkoutDataChanged(data.selectedDay)
+      if (data.selectedDay && data.changeKind && onWorkoutDataChanged) {
+        onWorkoutDataChanged(data.selectedDay, data.changeKind)
       }
     },
   })

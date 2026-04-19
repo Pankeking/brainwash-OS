@@ -5,7 +5,10 @@ export type ChatContext = {
 
 export interface ChatProps {
   context?: ChatContext
-  onWorkoutDataChanged?: (selectedDay: string) => void
+  onWorkoutDataChanged?: (
+    selectedDay: string,
+    changeKind?: 'set' | 'body' | 'body-definition',
+  ) => void
 }
 
 export type ChatSuggestion = {

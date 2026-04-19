@@ -2,6 +2,7 @@ import mongoose from 'mongoose'
 import { createServerFn } from '@tanstack/react-start'
 
 import { SetType } from '~/enums/enums'
+import { ExerciseModel } from '~/models/Exercise.model'
 
 import connectDB from './db'
 import { createLogTimestampForDayKey } from './dayKey'
@@ -52,6 +53,14 @@ export const addWorkoutSetFn = createServerFn({ method: 'POST' })
     }
 
     await workoutLog.save()
+    await ExerciseModel.updateOne(
+      { _id: exerciseId, userId },
+      {
+        $set: {
+          preferredSetType: data.type === SetType.TIMED ? 'timed' : 'reps',
+        },
+      },
+    )
     appLogInfo('BW_SET_LOG_USER', 'Set logged from app UI', {
       source: 'user',
       selectedDayKey,

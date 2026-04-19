@@ -1,5 +1,6 @@
 import { useMutation, type QueryClient } from '@tanstack/react-query'
 
+import { SetType } from '~/enums/enums'
 import {
   addWorkoutExerciseFn,
   removeWorkoutExerciseFn,
@@ -48,8 +49,11 @@ export function useWorkoutExerciseMutations({
           id: `temp-${Date.now()}`,
           name: newExercise.data.name,
           categoryIds: [],
+          preferredSetType: SetType.REPS,
           weeklySetGoal: null,
+          weeklyVolumeGoal: null,
           weekSetsDone: 0,
+          weekVolumeDone: 0,
           stats: {
             week: { best: null, avg: null, worst: null },
             month: { best: null, avg: null, worst: null },
@@ -193,8 +197,14 @@ export function useWorkoutExerciseMutations({
   })
 
   const updateExerciseWeeklyGoalMutation = useMutation({
-    mutationFn: (input: { data: { exerciseId: string; weeklySetGoal: number | null } }) =>
-      updateWorkoutExerciseWeeklyGoalFn(input),
+    mutationFn: (input: {
+      data: {
+        exerciseId: string
+        preferredSetType?: 'reps' | 'timed'
+        weeklySetGoal: number | null
+        weeklyVolumeGoal?: number | null
+      }
+    }) => updateWorkoutExerciseWeeklyGoalFn(input),
     onMutate: async (variables) => {
       await queryClient.cancelQueries({ queryKey: ['workout-day', selectedDay] })
       const previousData = queryClient.getQueryData<WorkoutDayData>(['workout-day', selectedDay])
@@ -206,7 +216,18 @@ export function useWorkoutExerciseMutations({
                 ...current,
                 exercises: current.exercises.map((exercise) =>
                   exercise.id === variables.data.exerciseId
-                    ? { ...exercise, weeklySetGoal: variables.data.weeklySetGoal }
+                    ? {
+                        ...exercise,
+                        preferredSetType:
+                          variables.data.preferredSetType === 'timed'
+                            ? SetType.TIMED
+                            : variables.data.preferredSetType === 'reps'
+                              ? SetType.REPS
+                              : exercise.preferredSetType,
+                        weeklySetGoal: variables.data.weeklySetGoal,
+                        weeklyVolumeGoal:
+                          variables.data.weeklyVolumeGoal ?? exercise.weeklyVolumeGoal,
+                      }
                     : exercise,
                 ),
               }

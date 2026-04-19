@@ -48,6 +48,8 @@ export function useWorkoutPageController(loaderData: WorkoutLoaderData) {
   const [isAddingCategory, setIsAddingCategory] = useState(false)
   const [isAddingExercise, setIsAddingExercise] = useState(false)
   const [metricDrafts, setMetricDrafts] = useState<Record<string, string>>({})
+  const [newBodyMetricKind, setNewBodyMetricKind] = useState<'weight' | 'size'>('size')
+  const [newBodyMetricLabel, setNewBodyMetricLabel] = useState('')
   const [newCategoryName, setNewCategoryName] = useState('')
   const [newExerciseName, setNewExerciseName] = useState('')
   const [notice, setNotice] = useState<{ message: string; tone: 'error' | 'info' } | null>(null)
@@ -125,7 +127,12 @@ export function useWorkoutPageController(loaderData: WorkoutLoaderData) {
     queryClient,
     weeksToShow,
   })
-  const { removeMetricMutation, upsertMetricMutation } = useBodyMetricMutations({
+  const {
+    createMetricDefinitionMutation,
+    removeMetricDefinitionMutation,
+    removeMetricMutation,
+    upsertMetricMutation,
+  } = useBodyMetricMutations({
     queryClient,
     selectedDay,
   })
@@ -191,6 +198,41 @@ export function useWorkoutPageController(loaderData: WorkoutLoaderData) {
     setNotice(null)
   }
 
+  const handleCreateBodyMetricDefinition = () => {
+    const label = newBodyMetricLabel.trim()
+    if (!label) {
+      setNotice({
+        message: 'Enter a metric name first.',
+        tone: 'error',
+      })
+      return
+    }
+    createMetricDefinitionMutation.mutate({
+      data: {
+        label,
+        kind: newBodyMetricKind,
+      },
+    })
+    setNewBodyMetricLabel('')
+    setNotice(null)
+  }
+
+  const handleUpdateExerciseWeeklyGoal = (
+    exerciseId: string,
+    weeklySetGoal: number | null,
+    weeklyVolumeGoal: number | null,
+    preferredSetType: SetType,
+  ) => {
+    updateExerciseWeeklyGoalMutation.mutate({
+      data: {
+        exerciseId,
+        preferredSetType: preferredSetType === SetType.TIMED ? 'timed' : 'reps',
+        weeklySetGoal,
+        weeklyVolumeGoal,
+      },
+    })
+  }
+
   useEffect(() => {
     if (!notice) {
       return
@@ -213,6 +255,7 @@ export function useWorkoutPageController(loaderData: WorkoutLoaderData) {
     handleAddExercise,
     handleAddSet,
     handleSaveMetric,
+    handleUpdateExerciseWeeklyGoal,
     isAddingCategory,
     isAddingExercise,
     isLoading,
@@ -222,12 +265,19 @@ export function useWorkoutPageController(loaderData: WorkoutLoaderData) {
     newCategoryName,
     newExerciseName,
     notice,
-    onAssistantWorkoutChanged: (nextSelectedDay: string) => {
+    onAssistantWorkoutChanged: (
+      nextSelectedDay: string,
+      changeKind: 'set' | 'body' | 'body-definition' = 'set',
+    ) => {
       setSelectedDay(nextSelectedDay)
-      focusRunningStopwatch()
+      if (changeKind === 'set') {
+        focusRunningStopwatch()
+      }
     },
+    createMetricDefinitionMutation,
     removeCategoryMutation,
     removeExerciseMutation,
+    removeMetricDefinitionMutation,
     removeMetricMutation,
     removeSetMutation,
     renameExerciseMutation,
@@ -238,6 +288,8 @@ export function useWorkoutPageController(loaderData: WorkoutLoaderData) {
     setIsAddingCategory,
     setIsAddingExercise,
     setMetricDrafts,
+    setNewBodyMetricKind,
+    setNewBodyMetricLabel,
     setNewCategoryName,
     setNewExerciseName,
     setSelectedDay,
@@ -247,5 +299,8 @@ export function useWorkoutPageController(loaderData: WorkoutLoaderData) {
     toggleExerciseCategoryMutation,
     updateExerciseWeeklyGoalMutation,
     weeklyStatsData,
+    handleCreateBodyMetricDefinition,
+    newBodyMetricKind,
+    newBodyMetricLabel,
   }
 }

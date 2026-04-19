@@ -1,4 +1,4 @@
-import { Check, Ruler, Trash2, Weight } from 'lucide-react'
+import { Check, PlusCircle, Ruler, Trash2, Weight } from 'lucide-react'
 
 import type { BodyMetricDefinition, BodyMetricEntry, BodyMetricLatestValue } from './workout.types'
 
@@ -7,9 +7,15 @@ interface WorkoutBodyTabProps {
   draftValues: Record<string, string>
   entries: BodyMetricEntry[]
   latest: BodyMetricLatestValue[]
+  newMetricKind: 'weight' | 'size'
+  newMetricLabel: string
   onChangeDraft: (metricKey: string, value: string) => void
+  onCreateDefinition: () => void
+  onRemoveDefinition: (metricKey: string) => void
   onRemoveEntry: (entryId: string) => void
   onSaveMetric: (metricKey: string) => void
+  onSetNewMetricKind: (kind: 'weight' | 'size') => void
+  onSetNewMetricLabel: (label: string) => void
 }
 
 export function WorkoutBodyTab({
@@ -17,9 +23,15 @@ export function WorkoutBodyTab({
   draftValues,
   entries,
   latest,
+  newMetricKind,
+  newMetricLabel,
   onChangeDraft,
+  onCreateDefinition,
+  onRemoveDefinition,
   onRemoveEntry,
   onSaveMetric,
+  onSetNewMetricKind,
+  onSetNewMetricLabel,
 }: WorkoutBodyTabProps) {
   const latestByMetric = new Map(latest.map((item) => [item.metricKey, item]))
   const groupedDefinitions = {
@@ -67,12 +79,66 @@ export function WorkoutBodyTab({
             Save
           </button>
         </div>
+        {definition.isCustom ? (
+          <div className="mt-2 flex justify-end">
+            <button
+              onClick={() => onRemoveDefinition(definition.key)}
+              className="rounded-lg border border-red-500/20 bg-red-500/10 px-2 py-1 text-[9px] font-black uppercase tracking-widest text-red-300"
+            >
+              Remove Metric
+            </button>
+          </div>
+        ) : null}
       </div>
     )
   }
 
   return (
     <div className="space-y-8">
+      <section className="rounded-2xl border border-slate-700 bg-[#2A333E] p-4">
+        <div className="mb-3 flex items-center gap-2 text-slate-500">
+          <PlusCircle size={12} className="text-orange-500" />
+          <h2 className="text-[10px] font-black uppercase tracking-[0.2em]">Custom Metrics</h2>
+        </div>
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,1fr)_auto_auto]">
+          <input
+            value={newMetricLabel}
+            onChange={(event) => onSetNewMetricLabel(event.target.value)}
+            placeholder="Forearm, shoulder, body fat..."
+            className="rounded-xl border border-slate-700 bg-[#1A1F26] px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-orange-500/40"
+          />
+          <div className="flex overflow-hidden rounded-xl border border-slate-700">
+            <button
+              onClick={() => onSetNewMetricKind('size')}
+              className={`px-3 py-2 text-[9px] font-black uppercase tracking-widest ${
+                newMetricKind === 'size'
+                  ? 'bg-orange-500 text-white'
+                  : 'bg-[#1A1F26] text-slate-400'
+              }`}
+            >
+              Size (cm)
+            </button>
+            <button
+              onClick={() => onSetNewMetricKind('weight')}
+              className={`px-3 py-2 text-[9px] font-black uppercase tracking-widest ${
+                newMetricKind === 'weight'
+                  ? 'bg-orange-500 text-white'
+                  : 'bg-[#1A1F26] text-slate-400'
+              }`}
+            >
+              Weight (kg)
+            </button>
+          </div>
+          <button
+            onClick={onCreateDefinition}
+            className="flex items-center justify-center gap-2 rounded-xl bg-orange-600 px-4 py-2 text-[9px] font-black uppercase tracking-widest text-white"
+          >
+            <PlusCircle size={12} />
+            Add Metric
+          </button>
+        </div>
+      </section>
+
       <section>
         <div className="mb-3 flex items-center gap-2 text-slate-500">
           <Weight size={12} className="text-orange-500" />

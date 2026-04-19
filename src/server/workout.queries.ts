@@ -9,50 +9,23 @@ import { WorkoutLogModel } from '~/models/WorkoutLog.model'
 import connectDB from './db'
 import { appLogError, appLogInfo } from './logger'
 import { dayKeyFromDateInTimeZone, getUtcRangeForDayKey } from './dayKey'
+import {
+  collectSetsByExercise,
+  collectWeeklyVolumeByExercise,
+  mapWorkoutExercises,
+} from './workout.query-helpers'
 import { getAuthenticatedUserObjectId } from './workout.auth'
 import { weeklyCategoryStatsInputSchema, workoutDayInputSchema } from './workout.schemas'
 import {
   APP_TIMEZONE,
   addDaysToDayKey,
-  type FlatSetRecord,
   findWorkoutLogsForDay,
   formatDayKeyForLabel,
   getRollingRangeFromDayKey,
-  getStatsFromSets,
   getWeekStartDayKey,
   parseSelectedDayKey,
   setToNumericValue,
 } from './workout.utils'
-
-function collectSetsByExercise(
-  logs: Array<{
-    exercises: Array<{
-      exercise: { exerciseId: mongoose.Types.ObjectId }
-      sets: Array<{ type: SetType; reps?: number; duration?: number }>
-    }>
-  }>,
-) {
-  const grouped = new Map<string, FlatSetRecord[]>()
-  for (const log of logs) {
-    for (const entry of log.exercises) {
-      const id = String(entry.exercise.exerciseId)
-      if (!grouped.has(id)) {
-        grouped.set(id, [])
-      }
-      const current = grouped.get(id)
-      if (!current) {
-        continue
-      }
-      for (const set of entry.sets) {
-        const value = setToNumericValue(set)
-        if (value !== null) {
-          current.push({ value })
-        }
-      }
-    }
-  }
-  return grouped
-}
 
 export const getWorkoutDayFn = createServerFn({ method: 'POST' })
   .inputValidator(workoutDayInputSchema)
@@ -120,27 +93,21 @@ export const getWorkoutDayFn = createServerFn({ method: 'POST' })
         }>,
       )
 
-      const exercises = exerciseDocs.map((exercise) => {
-        const id = String(exercise._id)
-        const weekSetRecords = weekSetsByExercise.get(id) || []
-        const rollingWeekSetRecords = rollingWeekSetsByExercise.get(id) || []
-        const parsedWeeklyGoal =
-          exercise.weeklySetGoal === null || exercise.weeklySetGoal === undefined
-            ? null
-            : Number(exercise.weeklySetGoal)
-        return {
-          id,
-          name: exercise.name,
-          categoryIds: (exercise.categories || []).map(
-            (categoryId: mongoose.Types.ObjectId | string) => String(categoryId),
-          ),
-          weeklySetGoal: Number.isFinite(parsedWeeklyGoal) ? parsedWeeklyGoal : null,
-          weekSetsDone: weekSetRecords.length,
-          stats: {
-            week: getStatsFromSets(rollingWeekSetRecords),
-            month: getStatsFromSets(monthSetsByExercise.get(id) || []),
-          },
-        }
+      const weekVolumeByExercise = collectWeeklyVolumeByExercise(
+        currentWeekLogs as Array<{
+          exercises: Array<{
+            exercise: { exerciseId: mongoose.Types.ObjectId }
+            sets: Array<{ type: SetType; reps?: number; duration?: number }>
+          }>
+        }>,
+      )
+
+      const exercises = mapWorkoutExercises({
+        exerciseDocs,
+        monthSetsByExercise,
+        rollingWeekSetsByExercise,
+        weekSetsByExercise,
+        weekVolumeByExercise,
       })
 
       const logs = dayLogs.flatMap((workoutLog) =>

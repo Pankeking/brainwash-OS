@@ -16,8 +16,11 @@ export interface WorkoutExercise {
   id: string
   name: string
   categoryIds: string[]
+  preferredSetType: SetType
   weeklySetGoal: number | null
+  weeklyVolumeGoal: number | null
   weekSetsDone: number
+  weekVolumeDone: number
   stats: {
     week: WorkoutExerciseStatsBucket
     month: WorkoutExerciseStatsBucket
@@ -57,6 +60,7 @@ export interface BodyMetricDefinition {
   label: string
   kind: 'weight' | 'size'
   unit: 'kg' | 'cm'
+  isCustom: boolean
 }
 
 export interface BodyMetricEntry {

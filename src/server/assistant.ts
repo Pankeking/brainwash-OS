@@ -2,11 +2,18 @@ import mongoose from 'mongoose'
 import { createServerFn } from '@tanstack/react-start'
 import { z } from 'zod'
 import { useAppSession } from '~/utils/session'
+import { BodyMetricDefinitionModel } from '~/models/BodyMetricDefinition.model'
 import { ExerciseModel } from '~/models/Exercise.model'
 import { WorkoutLogModel } from '~/models/WorkoutLog.model'
 import { SetType, Weekday } from '~/enums/enums'
 import connectDB from './db'
 import { ASSISTANT_MASTER_PROMPT, ASSISTANT_SKILLS } from './assistant.prompts'
+import {
+  findOrCreateBodyMeasurementLogForDay,
+  getBodyMetricDefinitionForUser,
+  getBodyMetricDefinitionsForUser,
+  toBodyMetricKey,
+} from './bodyMetrics.utils'
 import { getOptionalEnvValue } from './env'
 import { appLogError, appLogInfo, appLogWarn } from './logger'
 import {
@@ -47,6 +54,16 @@ type AssistantIntent =
       exerciseName: string
       setType: 'reps' | 'timed'
       value: number
+    }
+  | {
+      action: 'log_body_metric'
+      metricName: string
+      value: number
+    }
+  | {
+      action: 'create_body_metric'
+      label: string
+      kind: 'weight' | 'size'
     }
   | {
       action: 'unknown'
@@ -117,6 +134,17 @@ function parseIntentFallback(message: string): AssistantIntent {
       setType: 'timed',
       value: minutes * 60 + seconds,
       exerciseName: timedMatch[3].trim(),
+    }
+  }
+
+  const bodyMetricMatch = normalized.match(
+    /(?:log|track|record|add)\s+(?:my\s+)?([a-zA-Z][a-zA-Z0-9 _-]{1,40}?)\s+(?:at|as|to\s+)?(\d+(?:[.,]\d+)?)(?:\s*(kg|cm))?$/i,
+  )
+  if (bodyMetricMatch) {
+    return {
+      action: 'log_body_metric',
+      metricName: bodyMetricMatch[1].trim(),
+      value: Number(bodyMetricMatch[2].replace(',', '.')),
     }
   }
 
@@ -264,6 +292,7 @@ async function logAssistantSet(payload: {
     return {
       reply: 'You are not in exercises tab. Switch to exercises and try again.',
       didLogSet: false,
+      changeKind: null as 'set' | 'body' | 'body-definition' | null,
       selectedDay: contextSelectedDay,
       undo: null,
       suggestions: [] as AssistantSuggestion[],
@@ -288,6 +317,7 @@ async function logAssistantSet(payload: {
           ? `Exercise "${payload.exerciseName}" not found. Did you mean one of these?`
           : `Exercise "${payload.exerciseName}" not found.`,
       didLogSet: false,
+      changeKind: null as 'set' | 'body' | 'body-definition' | null,
       selectedDay: targetDayKey,
       undo: null,
       suggestions,
@@ -378,6 +408,7 @@ async function logAssistantSet(payload: {
         ? `Logged ${value} sec for ${matchedExercise.name} on ${targetDayKey}.`
         : `Logged ${value} reps for ${matchedExercise.name} on ${targetDayKey}.`,
     didLogSet: true,
+    changeKind: 'set' as const,
     selectedDay: targetDayKey,
     undo: {
       selectedDay: targetDayKey,
@@ -387,11 +418,142 @@ async function logAssistantSet(payload: {
   }
 }
 
+async function logAssistantBodyMetric(payload: {
+  userId: mongoose.Types.ObjectId
+  metricName: string
+  value: number
+  selectedDay?: string
+  model: string | null
+}) {
+  const targetDayKey = resolveSelectedDayKey(payload.selectedDay, APP_TIMEZONE)
+  const definition = await getBodyMetricDefinitionForUser(payload.userId, payload.metricName)
+  if (!definition) {
+    return {
+      reply: `Body metric "${payload.metricName}" is not tracked yet. Say "track ${payload.metricName} as size" or add it in the Body tab first.`,
+      didLogSet: false,
+      changeKind: null as 'set' | 'body' | 'body-definition' | null,
+      selectedDay: targetDayKey,
+      undo: null,
+      suggestions: [] as AssistantSuggestion[],
+    }
+  }
+
+  const log = await findOrCreateBodyMeasurementLogForDay(payload.userId, targetDayKey)
+  const existing = log.measurements.find(
+    (measurement: { metricKey: string }) => measurement.metricKey === definition.key,
+  )
+  const value = Number(payload.value.toFixed(2))
+  if (existing) {
+    existing.value = value
+    existing.loggedAt = log.date
+  } else {
+    log.measurements.push({
+      metricKey: definition.key,
+      label: definition.label,
+      kind: definition.kind,
+      unit: definition.unit,
+      value,
+      loggedAt: log.date,
+    })
+  }
+  await log.save()
+
+  appLogInfo('BW_BODY_METRIC_LOG_MCP', 'Body metric logged from assistant MCP', {
+    source: 'mcp',
+    model: payload.model,
+    selectedDay: targetDayKey,
+    metricKey: definition.key,
+    value,
+    unit: definition.unit,
+  })
+
+  return {
+    reply: `Logged ${value} ${definition.unit} for ${definition.label} on ${targetDayKey}.`,
+    didLogSet: false,
+    changeKind: 'body' as const,
+    selectedDay: targetDayKey,
+    undo: null,
+    suggestions: [] as AssistantSuggestion[],
+  }
+}
+
+async function createAssistantBodyMetricDefinition(payload: {
+  userId: mongoose.Types.ObjectId
+  label: string
+  kind: 'weight' | 'size'
+  selectedDay?: string
+  model: string | null
+}) {
+  const targetDayKey = resolveSelectedDayKey(payload.selectedDay, APP_TIMEZONE)
+  const label = payload.label.trim()
+  const key = toBodyMetricKey(label)
+  if (!label || !key) {
+    return {
+      reply: 'Could not create that body metric. Try a shorter name.',
+      didLogSet: false,
+      changeKind: null as 'set' | 'body' | 'body-definition' | null,
+      selectedDay: targetDayKey,
+      undo: null,
+      suggestions: [] as AssistantSuggestion[],
+    }
+  }
+
+  const existing = await getBodyMetricDefinitionForUser(payload.userId, label)
+  if (existing) {
+    return {
+      reply: `${existing.label} is already being tracked.`,
+      didLogSet: false,
+      changeKind: 'body-definition' as const,
+      selectedDay: targetDayKey,
+      undo: null,
+      suggestions: [] as AssistantSuggestion[],
+    }
+  }
+
+  await BodyMetricDefinitionModel.findOneAndUpdate(
+    {
+      userId: payload.userId,
+      key,
+    },
+    {
+      $setOnInsert: {
+        userId: payload.userId,
+        key,
+        label,
+        kind: payload.kind,
+        unit: payload.kind === 'weight' ? 'kg' : 'cm',
+        isCustom: true,
+      },
+    },
+    {
+      upsert: true,
+      returnDocument: 'after',
+    },
+  )
+
+  appLogInfo('BW_BODY_METRIC_CREATE_MCP', 'Body metric definition created from assistant MCP', {
+    source: 'mcp',
+    model: payload.model,
+    label,
+    kind: payload.kind,
+  })
+
+  return {
+    reply: `Now tracking ${label} in ${payload.kind === 'weight' ? 'kg' : 'cm'}.`,
+    didLogSet: false,
+    changeKind: 'body-definition' as const,
+    selectedDay: targetDayKey,
+    undo: null,
+    suggestions: [] as AssistantSuggestion[],
+  }
+}
+
 async function callProviderForIntent(payload: {
   message: string
   selectedDay: string
   activeTab?: string
   exerciseNames: string[]
+  metricNames: string[]
 }) {
   const provider = (getOptionalEnvValue('AI_PROVIDER') || 'google').toLowerCase()
   const skillsBlock = JSON.stringify(ASSISTANT_SKILLS)
@@ -399,6 +561,7 @@ async function callProviderForIntent(payload: {
     selectedDay: payload.selectedDay,
     activeTab: payload.activeTab || null,
     exercises: payload.exerciseNames,
+    bodyMetrics: payload.metricNames,
   })
 
   if (provider === 'google') {
@@ -547,7 +710,9 @@ export const assistantChatFn = createServerFn({ method: 'POST' })
 
       const contextSelectedDay = resolveSelectedDayKey(data.context?.selectedDay, APP_TIMEZONE)
       const exercises = await ExerciseModel.find({ userId }).lean()
+      const bodyMetricDefinitions = await getBodyMetricDefinitionsForUser(userId)
       const exerciseNames = exercises.map((exercise) => exercise.name)
+      const metricNames = bodyMetricDefinitions.map((definition) => definition.label)
       appLogInfo('BW_MCP_MESSAGE_RECEIVED', 'Assistant message received', {
         source: 'mcp',
         activeTab: data.context?.activeTab || null,
@@ -577,12 +742,29 @@ export const assistantChatFn = createServerFn({ method: 'POST' })
           return quickResult
         }
       }
+      if (quickIntent.action === 'log_body_metric') {
+        const quickResult = await logAssistantBodyMetric({
+          userId,
+          metricName: quickIntent.metricName,
+          value: quickIntent.value,
+          selectedDay: contextSelectedDay,
+          model: 'fast-path',
+        })
+        if (quickResult.changeKind === 'body') {
+          appLogInfo('BW_MCP_FAST_PATH_HIT', 'Assistant fast path used', {
+            source: 'mcp',
+            action: quickIntent.action,
+          })
+          return quickResult
+        }
+      }
 
       const providerResolution = await callProviderForIntent({
         message: data.message,
         selectedDay: contextSelectedDay,
         activeTab: data.context?.activeTab,
         exerciseNames,
+        metricNames,
       })
       if (providerResolution.failedAllModels) {
         appLogError('BW_MCP_ALL_MODELS_FAILED', 'Assistant model fallback chain failed', {
@@ -592,6 +774,7 @@ export const assistantChatFn = createServerFn({ method: 'POST' })
           reply:
             'Failed to reach available Gemini models right now. Please verify GOOGLE_API_KEY and try again.',
           didLogSet: false,
+          changeKind: null,
           selectedDay: contextSelectedDay,
           undo: null,
           suggestions: [],
@@ -604,7 +787,43 @@ export const assistantChatFn = createServerFn({ method: 'POST' })
         model: providerResolution.usedModel,
       })
 
-      if (inferredIntent.action !== 'log_set') {
+      if (inferredIntent.action === 'log_set') {
+        return logAssistantSet({
+          userId,
+          exercises: exercises.map((exercise) => ({
+            _id: exercise._id as mongoose.Types.ObjectId | string,
+            name: exercise.name,
+          })),
+          exerciseName: inferredIntent.exerciseName,
+          setType: inferredIntent.setType,
+          value: inferredIntent.value,
+          selectedDay: contextSelectedDay,
+          activeTab: data.context?.activeTab,
+          model: providerResolution.usedModel,
+        })
+      }
+
+      if (inferredIntent.action === 'log_body_metric') {
+        return logAssistantBodyMetric({
+          userId,
+          metricName: inferredIntent.metricName,
+          value: inferredIntent.value,
+          selectedDay: contextSelectedDay,
+          model: providerResolution.usedModel,
+        })
+      }
+
+      if (inferredIntent.action === 'create_body_metric') {
+        return createAssistantBodyMetricDefinition({
+          userId,
+          label: inferredIntent.label,
+          kind: inferredIntent.kind,
+          selectedDay: contextSelectedDay,
+          model: providerResolution.usedModel,
+        })
+      }
+
+      if (inferredIntent.action === 'unknown') {
         const seed = deriveSuggestionSeed(data.message)
         const suggestions = seed
           ? buildSuggestions({
@@ -620,21 +839,9 @@ export const assistantChatFn = createServerFn({ method: 'POST' })
           selectedDay: contextSelectedDay,
           undo: null,
           suggestions,
+          changeKind: null,
         }
       }
-      return logAssistantSet({
-        userId,
-        exercises: exercises.map((exercise) => ({
-          _id: exercise._id as mongoose.Types.ObjectId | string,
-          name: exercise.name,
-        })),
-        exerciseName: inferredIntent.exerciseName,
-        setType: inferredIntent.setType,
-        value: inferredIntent.value,
-        selectedDay: contextSelectedDay,
-        activeTab: data.context?.activeTab,
-        model: providerResolution.usedModel,
-      })
     } catch (error) {
       appLogError('BW_MCP_EXECUTION_FAILED', 'Assistant execution failed', {
         source: 'mcp',
@@ -643,6 +850,7 @@ export const assistantChatFn = createServerFn({ method: 'POST' })
       return {
         reply: 'Failed to process assistant request.',
         didLogSet: false,
+        changeKind: null,
         selectedDay: dayKeyFromDateInTimeZone(new Date(), APP_TIMEZONE),
         undo: null,
         suggestions: [],
@@ -678,6 +886,7 @@ export const assistantLogDirectFn = createServerFn({ method: 'POST' })
       return {
         reply: 'Failed to process assistant request.',
         didLogSet: false,
+        changeKind: null,
         selectedDay: dayKeyFromDateInTimeZone(new Date(), APP_TIMEZONE),
         undo: null,
         suggestions: [],

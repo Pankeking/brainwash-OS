@@ -10,6 +10,12 @@ export {
   toggleWorkoutExerciseCategoryFn,
   updateWorkoutExerciseWeeklyGoalFn,
 } from './workout.exercises'
-export { getBodyMetricsDayFn, removeBodyMetricFn, upsertBodyMetricFn } from './workout.metrics'
+export {
+  createBodyMetricDefinitionFn,
+  getBodyMetricsDayFn,
+  removeBodyMetricDefinitionFn,
+  removeBodyMetricFn,
+  upsertBodyMetricFn,
+} from './workout.metrics'
 export { getWorkoutDayFn, getWorkoutWeeklyCategoryStatsFn } from './workout.queries'
 export { addWorkoutSetFn, removeWorkoutSetFn } from './workout.sets'

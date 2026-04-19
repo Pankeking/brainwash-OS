@@ -3,18 +3,22 @@ import { createServerFn } from '@tanstack/react-start'
 import connectDB from './db'
 import { appLogInfo } from './logger'
 import {
-  BODY_METRIC_DEFINITIONS,
+  getBodyMetricDefinitionsForUser,
   findBodyMeasurementLogsForRange,
   findOrCreateBodyMeasurementLogForDay,
-  getBodyMetricDefinition,
+  getBodyMetricDefinitionForUser,
+  toBodyMetricKey,
 } from './bodyMetrics.utils'
 import { getAuthenticatedUserObjectId } from './workout.auth'
 import {
   bodyMetricInputSchema,
+  createBodyMetricDefinitionInputSchema,
   removeBodyMetricInputSchema,
+  removeBodyMetricDefinitionInputSchema,
   workoutDayInputSchema,
 } from './workout.schemas'
 import { addDaysToDayKey, parseSelectedDayKey } from './workout.utils'
+import { BodyMetricDefinitionModel } from '~/models/BodyMetricDefinition.model'
 
 export const getBodyMetricsDayFn = createServerFn({ method: 'POST' })
   .inputValidator(workoutDayInputSchema)
@@ -23,6 +27,7 @@ export const getBodyMetricsDayFn = createServerFn({ method: 'POST' })
     const userId = await getAuthenticatedUserObjectId()
     const selectedDayKey = parseSelectedDayKey(data.selectedDay)
     const historyStartDayKey = addDaysToDayKey(selectedDayKey, -29)
+    const definitions = await getBodyMetricDefinitionsForUser(userId)
 
     const logs = await findBodyMeasurementLogsForRange(userId, historyStartDayKey, selectedDayKey)
     const selectedDayLog = logs.find((log) => log.dayKey === selectedDayKey)
@@ -51,7 +56,7 @@ export const getBodyMetricsDayFn = createServerFn({ method: 'POST' })
     }
 
     return {
-      definitions: BODY_METRIC_DEFINITIONS,
+      definitions,
       entries:
         selectedDayLog?.measurements.map(
           (measurement: {
@@ -84,7 +89,7 @@ export const upsertBodyMetricFn = createServerFn({ method: 'POST' })
   .handler(async ({ data }) => {
     await connectDB()
     const userId = await getAuthenticatedUserObjectId()
-    const definition = getBodyMetricDefinition(data.metricKey)
+    const definition = await getBodyMetricDefinitionForUser(userId, data.metricKey)
     if (!definition) {
       throw new Error('Unknown metric')
     }
@@ -114,6 +119,62 @@ export const upsertBodyMetricFn = createServerFn({ method: 'POST' })
       metricKey: definition.key,
       value: data.value,
       unit: definition.unit,
+    })
+
+    return { success: true }
+  })
+
+export const createBodyMetricDefinitionFn = createServerFn({ method: 'POST' })
+  .inputValidator(createBodyMetricDefinitionInputSchema)
+  .handler(async ({ data }) => {
+    await connectDB()
+    const userId = await getAuthenticatedUserObjectId()
+    const label = data.label.trim()
+    const key = toBodyMetricKey(label)
+    const unit = data.kind === 'weight' ? 'kg' : 'cm'
+
+    if (!key) {
+      throw new Error('Invalid metric label')
+    }
+    const existing = await getBodyMetricDefinitionForUser(userId, label)
+    if (existing) {
+      return { success: true }
+    }
+
+    await BodyMetricDefinitionModel.findOneAndUpdate(
+      {
+        userId,
+        key,
+      },
+      {
+        $setOnInsert: {
+          userId,
+          key,
+          label,
+          kind: data.kind,
+          unit,
+          isCustom: true,
+        },
+      },
+      {
+        upsert: true,
+        returnDocument: 'after',
+      },
+    )
+
+    return { success: true }
+  })
+
+export const removeBodyMetricDefinitionFn = createServerFn({ method: 'POST' })
+  .inputValidator(removeBodyMetricDefinitionInputSchema)
+  .handler(async ({ data }) => {
+    await connectDB()
+    const userId = await getAuthenticatedUserObjectId()
+
+    await BodyMetricDefinitionModel.deleteOne({
+      userId,
+      key: data.metricKey,
+      isCustom: true,
     })
 
     return { success: true }

@@ -45,7 +45,7 @@ export default [
   {
     files: ['src/components/Chat.tsx', 'src/server/assistant.ts', 'src/server/voice.ts'],
     rules: {
-      'max-lines': ['warn', { max: 800, skipBlankLines: true, skipComments: true }],
+      'max-lines': ['warn', { max: 950, skipBlankLines: true, skipComments: true }],
     },
   },
   eslintConfigPrettier,

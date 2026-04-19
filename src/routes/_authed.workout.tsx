@@ -115,11 +115,7 @@ function WorkoutView() {
                   data: { exerciseId, categoryId },
                 })
               }
-              onUpdateExerciseWeeklyGoal={(exerciseId, weeklySetGoal) =>
-                controller.updateExerciseWeeklyGoalMutation.mutate({
-                  data: { exerciseId, weeklySetGoal },
-                })
-              }
+              onUpdateExerciseWeeklyGoal={controller.handleUpdateExerciseWeeklyGoal}
               sortedExercises={controller.sortedExercises}
             />
           )}
@@ -130,11 +126,19 @@ function WorkoutView() {
               draftValues={controller.metricDrafts}
               entries={controller.bodyMetricsData?.entries || []}
               latest={controller.bodyMetricsData?.latest || []}
+              newMetricKind={controller.newBodyMetricKind}
+              newMetricLabel={controller.newBodyMetricLabel}
               onChangeDraft={(metricKey, value) =>
                 controller.setMetricDrafts((current) => ({
                   ...current,
                   [metricKey]: value,
                 }))
+              }
+              onCreateDefinition={controller.handleCreateBodyMetricDefinition}
+              onRemoveDefinition={(metricKey) =>
+                controller.removeMetricDefinitionMutation.mutate({
+                  data: { metricKey },
+                })
               }
               onRemoveEntry={(entryId) =>
                 controller.removeMetricMutation.mutate({
@@ -142,6 +146,8 @@ function WorkoutView() {
                 })
               }
               onSaveMetric={controller.handleSaveMetric}
+              onSetNewMetricKind={controller.setNewBodyMetricKind}
+              onSetNewMetricLabel={controller.setNewBodyMetricLabel}
             />
           )}
 

@@ -83,11 +83,9 @@ export function ExerciseCardHeader({
                     .map((category) => (
                       <span
                         key={category.id}
-                        className="rounded-full px-1.5 py-0.5 text-[8px] font-black uppercase tracking-wider text-slate-950"
+                        className="h-1.5 w-1.5 rounded-full"
                         style={{ backgroundColor: category.color }}
-                      >
-                        {category.name}
-                      </span>
+                      />
                     ))}
               </div>
               {!isExpanded && (

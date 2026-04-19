@@ -28,6 +28,8 @@ export const renameExerciseInputSchema = z.object({
 export const updateExerciseWeeklyGoalInputSchema = z.object({
   exerciseId: z.string(),
   weeklySetGoal: z.number().int().min(1).max(999).nullable(),
+  weeklyVolumeGoal: z.number().int().min(1).max(99999).nullable().optional(),
+  preferredSetType: z.enum(['reps', 'timed']).optional(),
 })
 
 export const toggleExerciseCategoryInputSchema = z.object({
@@ -66,6 +68,15 @@ export const bodyMetricInputSchema = z.object({
   selectedDay: z.string(),
   metricKey: z.string().min(1).max(64),
   value: z.number().positive().max(9999),
+})
+
+export const createBodyMetricDefinitionInputSchema = z.object({
+  label: z.string().min(1).max(60),
+  kind: z.enum(['weight', 'size']),
+})
+
+export const removeBodyMetricDefinitionInputSchema = z.object({
+  metricKey: z.string().min(1).max(64),
 })
 
 export const removeBodyMetricInputSchema = z.object({

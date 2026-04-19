@@ -22,7 +22,12 @@ interface WorkoutExercisesTabProps {
   onSetIsAddingExercise: (value: boolean) => void
   onSetNewExerciseName: (value: string) => void
   onToggleExerciseCategory: (exerciseId: string, categoryId: string) => void
-  onUpdateExerciseWeeklyGoal: (exerciseId: string, weeklySetGoal: number | null) => void
+  onUpdateExerciseWeeklyGoal: (
+    exerciseId: string,
+    weeklySetGoal: number | null,
+    weeklyVolumeGoal: number | null,
+    preferredSetType: SetType,
+  ) => void
 }
 
 export function WorkoutExercisesTab({
@@ -97,8 +102,13 @@ export function WorkoutExercisesTab({
             onRemove={() => onRemoveExercise(exercise.id)}
             onRename={(nextName) => onRenameExercise(exercise.id, nextName)}
             onToggleCategory={(categoryId) => onToggleExerciseCategory(exercise.id, categoryId)}
-            onUpdateWeeklyGoal={(weeklySetGoal) =>
-              onUpdateExerciseWeeklyGoal(exercise.id, weeklySetGoal)
+            onUpdateWeeklyGoal={(weeklySetGoal, weeklyVolumeGoal, preferredSetType) =>
+              onUpdateExerciseWeeklyGoal(
+                exercise.id,
+                weeklySetGoal,
+                weeklyVolumeGoal,
+                preferredSetType,
+              )
             }
             onToggleExpand={(id) =>
               onSetExpandedExerciseId((current) => (current === id ? null : id))
@@ -106,7 +116,10 @@ export function WorkoutExercisesTab({
             isExpanded={expandedExerciseId === exercise.id}
             count={logCountByExercise.get(exercise.id) || 0}
             weeklySetGoal={exercise.weeklySetGoal}
+            preferredSetType={exercise.preferredSetType}
+            weeklyVolumeGoal={exercise.weeklyVolumeGoal}
             weekSetsDone={exercise.weekSetsDone}
+            weekVolumeDone={exercise.weekVolumeDone}
             stats={exercise.stats}
           />
         ))}

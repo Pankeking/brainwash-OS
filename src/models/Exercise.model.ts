@@ -5,6 +5,8 @@ type ExerciseModelDoc = {
   name: string
   categories: mongoose.Types.ObjectId[]
   weeklySetGoal?: number | null
+  weeklyVolumeGoal?: number | null
+  preferredSetType?: 'reps' | 'timed' | null
 }
 
 const exerciseModelSchema = new mongoose.Schema(
@@ -27,6 +29,16 @@ const exerciseModelSchema = new mongoose.Schema(
       min: 1,
       default: null,
     },
+    weeklyVolumeGoal: {
+      type: Number,
+      min: 1,
+      default: null,
+    },
+    preferredSetType: {
+      type: String,
+      enum: ['reps', 'timed'],
+      default: null,
+    },
   },
   {
     timestamps: true,
@@ -42,6 +54,26 @@ if (existingExerciseModel && !existingExerciseModel.schema.path('weeklySetGoal')
     weeklySetGoal: {
       type: Number,
       min: 1,
+      default: null,
+    },
+  })
+}
+
+if (existingExerciseModel && !existingExerciseModel.schema.path('weeklyVolumeGoal')) {
+  ;(existingExerciseModel as mongoose.Model<ExerciseModelDoc>).schema.add({
+    weeklyVolumeGoal: {
+      type: Number,
+      min: 1,
+      default: null,
+    },
+  })
+}
+
+if (existingExerciseModel && !existingExerciseModel.schema.path('preferredSetType')) {
+  ;(existingExerciseModel as mongoose.Model<ExerciseModelDoc>).schema.add({
+    preferredSetType: {
+      type: String,
+      enum: ['reps', 'timed'],
       default: null,
     },
   })

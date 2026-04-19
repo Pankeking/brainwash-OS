@@ -3,6 +3,7 @@ import type { PointerEvent } from 'react'
 
 import { SetType } from '~/enums/enums'
 
+import { ExerciseCardMetaPane } from './ExerciseCardMetaPane'
 import type { ExerciseCardCategory } from './exercise-card.types'
 
 interface ExerciseCardDetailsProps {
@@ -18,12 +19,16 @@ interface ExerciseCardDetailsProps {
   goalProgressPct: number
   hasWeeklyGoal: boolean
   onAdd: (payload: { type: SetType; value: number }) => void
-  onRemove: () => void
   onSetConfirmingDelete: (value: boolean) => void
   onSetGoalDraft: (value: number | ((current: number) => number)) => void
+  onSetVolumeGoalDraft: (value: number | ((current: number) => number)) => void
   onSetType: (value: SetType) => void
   onToggleCategory: (categoryId: string) => void
-  onUpdateWeeklyGoal: (weeklySetGoal: number | null) => void
+  onUpdateWeeklyGoal: (
+    weeklySetGoal: number | null,
+    weeklyVolumeGoal: number | null,
+    preferredSetType: SetType,
+  ) => void
   orderedCategoryIds: string[]
   setType: SetType
   stats: {
@@ -31,8 +36,11 @@ interface ExerciseCardDetailsProps {
     month: { best: number | null; avg: number | null; worst: number | null }
   }
   tempValue: number
+  volumeGoalDraft: number
   weekSetsDone: number
+  weekVolumeDone: number
   weeklySetGoal: number | null
+  weeklyVolumeGoal: number | null
 }
 
 export function ExerciseCardDetails({
@@ -45,6 +53,7 @@ export function ExerciseCardDetails({
   onAdd,
   onSetConfirmingDelete,
   onSetGoalDraft,
+  onSetVolumeGoalDraft,
   onSetType,
   onToggleCategory,
   onUpdateWeeklyGoal,
@@ -52,8 +61,11 @@ export function ExerciseCardDetails({
   setType,
   stats,
   tempValue,
+  volumeGoalDraft,
   weekSetsDone,
+  weekVolumeDone,
   weeklySetGoal,
+  weeklyVolumeGoal,
 }: ExerciseCardDetailsProps) {
   return (
     <div className="overflow-x-auto snap-x snap-mandatory">
@@ -108,7 +120,7 @@ export function ExerciseCardDetails({
                 <button
                   onClick={(event) => {
                     event.stopPropagation()
-                    onUpdateWeeklyGoal(goalDraft)
+                    onUpdateWeeklyGoal(goalDraft, volumeGoalDraft, setType)
                   }}
                   className="ml-auto h-7 rounded-lg bg-orange-600 px-2.5 text-[9px] font-black uppercase tracking-widest"
                 >
@@ -118,13 +130,47 @@ export function ExerciseCardDetails({
                   <button
                     onClick={(event) => {
                       event.stopPropagation()
-                      onUpdateWeeklyGoal(null)
+                      onUpdateWeeklyGoal(null, weeklyVolumeGoal, setType)
                     }}
                     className="h-7 rounded-lg bg-slate-700 px-2.5 text-[9px] font-black uppercase tracking-widest text-slate-300"
                   >
                     Clear
                   </button>
                 )}
+              </div>
+              <div className="mt-3 border-t border-slate-700/40 pt-3">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="text-[9px] font-black uppercase tracking-widest text-slate-400">
+                    {setType === SetType.TIMED ? 'Weekly target seconds' : 'Weekly target reps'}
+                  </div>
+                  <div className="text-[9px] font-black uppercase tracking-widest text-orange-400">
+                    {weekVolumeDone}
+                    {weeklyVolumeGoal ? ` / ${weeklyVolumeGoal}` : ''}
+                  </div>
+                </div>
+                <div className="mt-2 flex items-center gap-1">
+                  <button
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      onSetVolumeGoalDraft((value) => Math.max(1, value - 5))
+                    }}
+                    className="w-7 h-7 flex items-center justify-center rounded-lg bg-[#2A333E] text-slate-300"
+                  >
+                    <Minus size={12} />
+                  </button>
+                  <div className="w-16 text-center font-mono text-sm font-black text-white">
+                    {volumeGoalDraft}
+                  </div>
+                  <button
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      onSetVolumeGoalDraft((value) => value + 5)
+                    }}
+                    className="w-7 h-7 flex items-center justify-center rounded-lg bg-[#2A333E] text-slate-300"
+                  >
+                    <Plus size={12} />
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -225,71 +271,13 @@ export function ExerciseCardDetails({
           </div>
         </div>
 
-        <div className="min-w-full snap-start pl-1">
-          <div className="rounded-xl border border-slate-700 bg-[#1A1F26] p-3">
-            <div className="mb-2 text-[9px] font-black uppercase tracking-widest text-slate-500">
-              Categories
-            </div>
-            {allCategories.length === 0 ? (
-              <p className="mb-4 text-[9px] italic text-slate-600">
-                Create categories above to tag this exercise
-              </p>
-            ) : (
-              <div className="mb-4 flex flex-wrap gap-1.5">
-                {orderedCategoryIds.map((categoryId) => {
-                  const category = allCategories.find((item) => item.id === categoryId)
-                  if (!category) {
-                    return null
-                  }
-                  const isSelected = categoryIds.includes(category.id)
-                  return (
-                    <button
-                      key={category.id}
-                      onClick={(event) => {
-                        event.stopPropagation()
-                        onToggleCategory(category.id)
-                      }}
-                      className="rounded-md border px-2 py-1 text-[9px] font-bold transition-all"
-                      style={{
-                        backgroundColor: isSelected ? `${category.color}ee` : `${category.color}22`,
-                        borderColor: isSelected ? category.color : `${category.color}55`,
-                        color: isSelected ? '#111827' : '#e2e8f0',
-                      }}
-                    >
-                      {category.name}
-                    </button>
-                  )
-                })}
-              </div>
-            )}
-            <div className="mb-2 text-[9px] font-black uppercase tracking-widest text-slate-500">
-              Stats
-            </div>
-            <div className="mb-3 grid grid-cols-3 gap-2">
-              <div className="text-[9px] font-black uppercase text-slate-500">Range</div>
-              <div className="text-center text-[9px] font-black uppercase text-slate-500">Best</div>
-              <div className="text-center text-[9px] font-black uppercase text-slate-500">
-                Avg/Worst
-              </div>
-            </div>
-            <div className="grid grid-cols-3 gap-2">
-              <div className="text-[10px] font-black text-slate-300">Last 7d</div>
-              <div className="text-center text-[11px] font-black text-green-400">
-                {stats.week.best ?? '-'}
-              </div>
-              <div className="text-center text-[11px] font-black text-slate-300">
-                {stats.week.avg ?? '-'} / {stats.week.worst ?? '-'}
-              </div>
-              <div className="text-[10px] font-black text-slate-300">Last 30d</div>
-              <div className="text-center text-[11px] font-black text-green-400">
-                {stats.month.best ?? '-'}
-              </div>
-              <div className="text-center text-[11px] font-black text-slate-300">
-                {stats.month.avg ?? '-'} / {stats.month.worst ?? '-'}
-              </div>
-            </div>
-          </div>
-        </div>
+        <ExerciseCardMetaPane
+          allCategories={allCategories}
+          categoryIds={categoryIds}
+          onToggleCategory={onToggleCategory}
+          orderedCategoryIds={orderedCategoryIds}
+          stats={stats}
+        />
       </div>
     </div>
   )

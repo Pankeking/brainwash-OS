@@ -36,8 +36,11 @@ export default function ExerciseActionCard({
   onToggleExpand,
   isExpanded,
   count,
+  preferredSetType,
   weeklySetGoal,
+  weeklyVolumeGoal,
   weekSetsDone,
+  weekVolumeDone,
   stats,
 }: ExerciseActionCardProps) {
   const repsStorageKey = useMemo(() => `workout-last-value:${id}:${SetType.REPS}`, [id])
@@ -47,10 +50,11 @@ export default function ExerciseActionCard({
 
   const [editName, setEditName] = useState(name)
   const [goalDraft, setGoalDraft] = useState(weeklySetGoal ?? 10)
+  const [volumeGoalDraft, setVolumeGoalDraft] = useState(weeklyVolumeGoal ?? 100)
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
   const [repsValue, setRepsValue] = useState(10)
-  const [setType, setSetType] = useState<SetType>(SetType.REPS)
+  const [setType, setSetType] = useState(preferredSetType)
   const [storageReady, setStorageReady] = useState(false)
   const [timedValue, setTimedValue] = useState(30)
 
@@ -135,6 +139,14 @@ export default function ExerciseActionCard({
     setGoalDraft(weeklySetGoal ?? 10)
   }, [weeklySetGoal])
 
+  useEffect(() => {
+    setVolumeGoalDraft(weeklyVolumeGoal ?? 100)
+  }, [weeklyVolumeGoal])
+
+  useEffect(() => {
+    setSetType(preferredSetType)
+  }, [preferredSetType])
+
   return (
     <div
       onClick={() => !isExpanded && !isEditing && onToggleExpand(id)}
@@ -187,9 +199,9 @@ export default function ExerciseActionCard({
             goalProgressPct={goalProgressPct}
             hasWeeklyGoal={hasWeeklyGoal}
             onAdd={onAdd}
-            onRemove={onRemove}
             onSetConfirmingDelete={setIsConfirmingDelete}
             onSetGoalDraft={setGoalDraft}
+            onSetVolumeGoalDraft={setVolumeGoalDraft}
             onSetType={setSetType}
             onToggleCategory={onToggleCategory}
             onUpdateWeeklyGoal={onUpdateWeeklyGoal}
@@ -197,8 +209,11 @@ export default function ExerciseActionCard({
             setType={setType}
             stats={stats}
             tempValue={tempValue}
+            volumeGoalDraft={volumeGoalDraft}
             weekSetsDone={weekSetsDone}
+            weekVolumeDone={weekVolumeDone}
             weeklySetGoal={weeklySetGoal}
+            weeklyVolumeGoal={weeklyVolumeGoal}
           />
         )}
       </div>

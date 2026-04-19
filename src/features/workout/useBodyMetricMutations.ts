@@ -1,6 +1,11 @@
 import { useMutation, type QueryClient } from '@tanstack/react-query'
 
-import { removeBodyMetricFn, upsertBodyMetricFn } from '~/server/workout'
+import {
+  createBodyMetricDefinitionFn,
+  removeBodyMetricDefinitionFn,
+  removeBodyMetricFn,
+  upsertBodyMetricFn,
+} from '~/server/workout'
 
 import type { BodyMetricsDayData } from './workout.types'
 
@@ -52,7 +57,24 @@ export function useBodyMetricMutations({ queryClient, selectedDay }: UseBodyMetr
     },
   })
 
+  const createMetricDefinitionMutation = useMutation({
+    mutationFn: (input: { data: { label: string; kind: 'weight' | 'size' } }) =>
+      createBodyMetricDefinitionFn(input),
+    onSettled: () => {
+      void refreshBodyMetrics()
+    },
+  })
+
+  const removeMetricDefinitionMutation = useMutation({
+    mutationFn: (input: { data: { metricKey: string } }) => removeBodyMetricDefinitionFn(input),
+    onSettled: () => {
+      void refreshBodyMetrics()
+    },
+  })
+
   return {
+    createMetricDefinitionMutation,
+    removeMetricDefinitionMutation,
     removeMetricMutation,
     upsertMetricMutation,
   }

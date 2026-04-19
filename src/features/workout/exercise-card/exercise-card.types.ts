@@ -15,12 +15,19 @@ export interface ExerciseActionCardProps {
   onRemove: () => void
   onRename: (newName: string) => void
   onToggleCategory: (categoryId: string) => void
-  onUpdateWeeklyGoal: (weeklySetGoal: number | null) => void
+  onUpdateWeeklyGoal: (
+    weeklySetGoal: number | null,
+    weeklyVolumeGoal: number | null,
+    preferredSetType: SetType,
+  ) => void
   onToggleExpand: (id: string) => void
   isExpanded: boolean
   count: number
+  preferredSetType: SetType
   weeklySetGoal: number | null
+  weeklyVolumeGoal: number | null
   weekSetsDone: number
+  weekVolumeDone: number
   stats: {
     week: { best: number | null; avg: number | null; worst: number | null }
     month: { best: number | null; avg: number | null; worst: number | null }

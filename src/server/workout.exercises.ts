@@ -29,6 +29,7 @@ export const addWorkoutExerciseFn = createServerFn({ method: 'POST' })
           userId,
           name,
           categories: [],
+          preferredSetType: 'reps',
         },
       },
       {
@@ -87,7 +88,15 @@ export const updateWorkoutExerciseWeeklyGoalFn = createServerFn({ method: 'POST'
     const userId = await getAuthenticatedUserObjectId()
     const updated = await ExerciseModel.findOneAndUpdate(
       { _id: new mongoose.Types.ObjectId(data.exerciseId), userId },
-      { $set: { weeklySetGoal: data.weeklySetGoal } },
+      {
+        $set: {
+          weeklySetGoal: data.weeklySetGoal,
+          ...(data.weeklyVolumeGoal !== undefined
+            ? { weeklyVolumeGoal: data.weeklyVolumeGoal }
+            : {}),
+          ...(data.preferredSetType ? { preferredSetType: data.preferredSetType } : {}),
+        },
+      },
       { returnDocument: 'after' },
     ).lean()
 
@@ -99,7 +108,15 @@ export const updateWorkoutExerciseWeeklyGoalFn = createServerFn({ method: 'POST'
 
     return {
       success: true,
+      preferredSetType:
+        updated?.preferredSetType === 'timed'
+          ? 'timed'
+          : updated?.preferredSetType === 'reps'
+            ? 'reps'
+            : null,
       weeklySetGoal: typeof updated?.weeklySetGoal === 'number' ? updated.weeklySetGoal : null,
+      weeklyVolumeGoal:
+        typeof updated?.weeklyVolumeGoal === 'number' ? updated.weeklyVolumeGoal : null,
     }
   })
 
