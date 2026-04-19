@@ -44,6 +44,11 @@ Use this file as the first-pass guide for humans and LLMs editing this repo.
 - Validate input at the server boundary.
 - Keep auth and user scoping explicit.
 
+9. Remove placeholder and scaffold code.
+
+- Do not keep unused example queries, empty server files, placeholder routes, or UI buttons with no behavior.
+- If the shipped app does not use it, delete it instead of keeping “maybe later” code in the main tree.
+
 ## Body Metric Rule
 
 Body metric definitions must come from:
@@ -59,6 +64,7 @@ Before finishing a change:
 
 - Check whether any new constant is actually user/domain data.
 - Check whether any numeric input should use shared locale-tolerant parsing.
+- Check whether any placeholder/example code should be deleted instead of preserved.
 - Check whether the file can be split further.
 - Run `pnpm exec eslint .`
 - Run `pnpm exec tsc --noEmit`

@@ -64,19 +64,9 @@ function Home() {
                 Exercise
               </Button>
             </Link>
-
-            <Link to="/todos">
-              <Button variant="secondary" className="min-w-[110px]">
-                Tasks
-              </Button>
-            </Link>
-
-            <Button variant="accent" className="min-w-[110px]">
-              Goals
-            </Button>
             <Button
               onClick={handleLogout}
-              variant="ghost"
+              variant="secondary"
               className="min-w-[110px]"
               disabled={logoutMutation.isPending}
             >

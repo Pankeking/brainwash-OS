@@ -36,6 +36,7 @@ Current tests focus on the date/day-key behavior because that logic is the ident
 - timezone-aware conversion between timestamps and workout days
 - selected-day fallback behavior
 - creation of per-day log timestamps
+- locale-tolerant numeric parsing for body metrics (`68,5` and `68.5`)
 
 ## Environment
 
