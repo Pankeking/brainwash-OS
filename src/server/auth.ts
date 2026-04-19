@@ -62,11 +62,6 @@ export const initiateOAuthFn = createServerFn({ method: 'GET' })
 async function authenticateGitHubUser(githubProfile: GitHubProfile) {
   await connectDB()
 
-  const now = new Date()
-  const accessTokenExpiresAt = githubProfile.expiresIn
-    ? new Date(Date.now() + githubProfile.expiresIn * 1000)
-    : now
-
   const user = await UserModel.findOneAndUpdate(
     {
       provider: 'github',
@@ -82,13 +77,6 @@ async function authenticateGitHubUser(githubProfile: GitHubProfile) {
       avatarUrl: githubProfile.avatar_url || undefined,
       provider: 'github',
       providerUserId: String(githubProfile.id),
-      providerAccessToken: githubProfile.accessToken,
-      providerRefreshToken: githubProfile.refreshToken || '',
-      providerExpiresAt: accessTokenExpiresAt,
-      providerTokenType: githubProfile.tokenType || 'bearer',
-      providerScope: githubProfile.scope || '',
-      providerIdToken: githubProfile.idToken || '',
-      providerAccessTokenExpiresAt: accessTokenExpiresAt,
     },
     {
       upsert: true,
@@ -119,7 +107,8 @@ export const githubAuthCallbackFn = createServerFn({ method: 'GET' })
   .inputValidator((data: { code: string; state: string }) => data)
   .handler(async ({ data }) => {
     const session = await useAppSession()
-    const oauthRedirectUri = session.data.oauthRedirectUri || `${getEnvValue('APP_URL')}/auth/github/callback`
+    const oauthRedirectUri =
+      session.data.oauthRedirectUri || `${getEnvValue('APP_URL')}/auth/github/callback`
 
     if (data.state !== session.data.oauthState) {
       throw new Error('Invalid state')

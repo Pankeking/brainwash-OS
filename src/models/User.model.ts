@@ -8,15 +8,17 @@ const userSchema = new mongoose.Schema(
     avatarUrl: { type: String, required: false },
     provider: { type: String, required: true },
     providerUserId: { type: String, required: true },
-    providerAccessToken: { type: String, required: true },
-    providerRefreshToken: { type: String, required: true },
-    providerExpiresAt: { type: Date, required: true },
-    providerTokenType: { type: String, required: true },
-    providerScope: { type: String, required: true },
-    providerIdToken: { type: String, required: true },
-    providerAccessTokenExpiresAt: { type: Date, required: true },
+    providerAccessToken: { type: String, required: false, select: false },
+    providerRefreshToken: { type: String, required: false, select: false },
+    providerExpiresAt: { type: Date, required: false, select: false },
+    providerTokenType: { type: String, required: false, select: false },
+    providerScope: { type: String, required: false, select: false },
+    providerIdToken: { type: String, required: false, select: false },
+    providerAccessTokenExpiresAt: { type: Date, required: false, select: false },
   },
   { timestamps: true },
 )
+
+userSchema.index({ provider: 1, providerUserId: 1 }, { unique: true })
 
 export const UserModel = mongoose.models.User || mongoose.model('User', userSchema)

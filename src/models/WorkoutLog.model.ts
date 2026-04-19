@@ -11,6 +11,7 @@ const workoutLogSchema = new mongoose.Schema(
       required: true,
       index: true,
     },
+    dayKey: { type: String, required: false, index: true },
     date: { type: Date, required: true, index: true },
     weekday: { type: String, enum: Object.values(Weekday), required: true },
     exercises: [
@@ -27,7 +28,7 @@ const workoutLogSchema = new mongoose.Schema(
 
 workoutLogSchema.index({ userId: 1, date: -1 })
 workoutLogSchema.index({ userId: 1, weekday: 1 })
-workoutLogSchema.index({ userId: 1, date: 1, weekday: 1 }, { unique: true })
+workoutLogSchema.index({ userId: 1, dayKey: 1 }, { unique: true, sparse: true })
 
 export const WorkoutLogModel =
   mongoose.models.WorkoutLog || mongoose.model('WorkoutLog', workoutLogSchema)

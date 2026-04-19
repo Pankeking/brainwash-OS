@@ -21,6 +21,6 @@ export default async function connectDB() {
         error: 'Unknown MongoDB connection error',
       })
     }
-    process.exit(1)
+    throw err
   }
 }

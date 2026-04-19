@@ -24,7 +24,7 @@ Rules:
 - setType "timed" means seconds
 - do not invent exercise names
 - select one exact exercise name from the provided exercise list
-- assume logging is always for today
+- use selectedDay from context when present, otherwise default to today
 `.trim()
 
 export const ASSISTANT_SKILLS = [

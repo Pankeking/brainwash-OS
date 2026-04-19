@@ -1,12 +1,15 @@
 import { createServerFn } from '@tanstack/react-start'
 import { z } from 'zod'
+import { useAppSession } from '~/utils/session'
 import { getOptionalEnvValue } from './env'
 import { appLogError, appLogInfo, appLogWarn } from './logger'
 
+const MAX_AUDIO_BASE64_LENGTH = 2_000_000
+
 const transcribeVoiceInputSchema = z.object({
-  audioBase64: z.string().min(1),
+  audioBase64: z.string().min(1).max(MAX_AUDIO_BASE64_LENGTH),
   mimeType: z.string().min(1).max(120).default('audio/webm'),
-  liveAudioBase64: z.string().min(1).optional(),
+  liveAudioBase64: z.string().min(1).max(MAX_AUDIO_BASE64_LENGTH).optional(),
   liveMimeType: z.string().min(1).max(120).optional(),
 })
 
@@ -53,7 +56,7 @@ const LIVE_ONLY_AUDIO_MODELS = new Set([
 ])
 
 function shouldUseGoogleLiveVoice() {
-  const rawValue = (getOptionalEnvValue('GOOGLE_VOICE_USE_LIVE_API') || 'true').toLowerCase()
+  const rawValue = (getOptionalEnvValue('GOOGLE_VOICE_USE_LIVE_API') || 'false').toLowerCase()
   return rawValue !== '0' && rawValue !== 'false' && rawValue !== 'off'
 }
 
@@ -138,29 +141,52 @@ function getOrderedGoogleTranscriptionModels() {
   return defaultModels
 }
 
+type UnknownRecord = Record<string, unknown>
+
+function asRecord(value: unknown): UnknownRecord | null {
+  return typeof value === 'object' && value !== null ? (value as UnknownRecord) : null
+}
+
+function readRecordPath(record: UnknownRecord | null, path: string[]) {
+  let current: unknown = record
+  for (const segment of path) {
+    const currentRecord = asRecord(current)
+    if (!currentRecord) {
+      return undefined
+    }
+    current = currentRecord[segment]
+  }
+  return current
+}
+
 function getLiveTranscriptCandidates(payload: unknown) {
-  const value = payload as Record<string, any>
+  const value = asRecord(payload)
   const candidates: string[] = []
-  const modelParts = value?.serverContent?.modelTurn?.parts || value?.server_content?.model_turn?.parts
+  const modelParts =
+    readRecordPath(value, ['serverContent', 'modelTurn', 'parts']) ||
+    readRecordPath(value, ['server_content', 'model_turn', 'parts'])
   if (Array.isArray(modelParts)) {
     modelParts.forEach((part) => {
-      if (typeof part?.text === 'string') {
-        candidates.push(part.text)
+      const text = readRecordPath(asRecord(part), ['text'])
+      if (typeof text === 'string') {
+        candidates.push(text)
       }
-      if (typeof part?.inlineData?.text === 'string') {
-        candidates.push(part.inlineData.text)
+      const inlineDataText = readRecordPath(asRecord(part), ['inlineData', 'text'])
+      if (typeof inlineDataText === 'string') {
+        candidates.push(inlineDataText)
       }
-      if (typeof part?.inline_data?.text === 'string') {
-        candidates.push(part.inline_data.text)
+      const inlineDataSnakeText = readRecordPath(asRecord(part), ['inline_data', 'text'])
+      if (typeof inlineDataSnakeText === 'string') {
+        candidates.push(inlineDataSnakeText)
       }
     })
   }
   const directCandidates = [
-    value?.serverContent?.inputTranscription?.text,
-    value?.serverContent?.outputTranscription?.text,
-    value?.server_content?.input_transcription?.text,
-    value?.server_content?.output_transcription?.text,
-    value?.text,
+    readRecordPath(value, ['serverContent', 'inputTranscription', 'text']),
+    readRecordPath(value, ['serverContent', 'outputTranscription', 'text']),
+    readRecordPath(value, ['server_content', 'input_transcription', 'text']),
+    readRecordPath(value, ['server_content', 'output_transcription', 'text']),
+    readRecordPath(value, ['text']),
   ]
   directCandidates.forEach((entry) => {
     if (typeof entry === 'string' && entry.trim()) {
@@ -168,13 +194,6 @@ function getLiveTranscriptCandidates(payload: unknown) {
     }
   })
   return candidates
-}
-
-type VoiceTranscriptionResult = {
-  transcript: string
-  provider: 'google'
-  model: string
-  route: 'live' | 'generateContent'
 }
 
 async function transcribeWithGoogleLive(
@@ -217,7 +236,7 @@ async function transcribeWithGoogleLive(
       try {
         websocket.close()
       } catch {
-        undefined
+        return
       }
       resolve(value)
     }
@@ -237,7 +256,7 @@ async function transcribeWithGoogleLive(
       try {
         websocket.close()
       } catch {
-        undefined
+        return
       }
       reject(error)
     }
@@ -276,17 +295,20 @@ async function transcribeWithGoogleLive(
       if (!rawData) {
         return
       }
-      let parsed: Record<string, any> | null = null
+      let parsed: unknown
       try {
-        parsed = JSON.parse(rawData) as Record<string, any>
+        parsed = JSON.parse(rawData) as unknown
       } catch {
         return
       }
-      if (!parsed) {
+      const parsedRecord = asRecord(parsed)
+      if (!parsedRecord) {
         return
       }
 
-      const setupComplete = parsed.setupComplete || parsed.setup_complete
+      const setupComplete =
+        readRecordPath(parsedRecord, ['setupComplete']) ||
+        readRecordPath(parsedRecord, ['setup_complete'])
       if (setupComplete && !isSetupComplete) {
         isSetupComplete = true
         appLogInfo('BW_VOICE_LIVE_SETUP_COMPLETE', 'Live websocket setup completed', {
@@ -326,13 +348,21 @@ async function transcribeWithGoogleLive(
         return
       }
 
-      if (parsed.error?.message || parsed.error?.status) {
+      const parsedError = readRecordPath(parsedRecord, ['error'])
+      const parsedErrorRecord = asRecord(parsedError)
+      const parsedErrorMessage = readRecordPath(parsedErrorRecord, ['message'])
+      const parsedErrorStatus = readRecordPath(parsedErrorRecord, ['status'])
+      if (parsedErrorMessage || parsedErrorStatus) {
         clearTimeout(timeout)
-        finalizeFailure(new Error(parsed.error?.message || 'Live API returned error'))
+        finalizeFailure(
+          new Error(
+            typeof parsedErrorMessage === 'string' ? parsedErrorMessage : 'Live API returned error',
+          ),
+        )
         return
       }
 
-      const candidates = getLiveTranscriptCandidates(parsed)
+      const candidates = getLiveTranscriptCandidates(parsedRecord)
       candidates.forEach((rawCandidate) => {
         const candidate = extractTranscriptCandidate(rawCandidate)
         if (!candidate) {
@@ -350,13 +380,14 @@ async function transcribeWithGoogleLive(
       })
 
       const turnComplete =
-        parsed.serverContent?.turnComplete === true ||
-        parsed.server_content?.turn_complete === true ||
-        parsed.turnComplete === true ||
-        parsed.turn_complete === true
+        readRecordPath(parsedRecord, ['serverContent', 'turnComplete']) === true ||
+        readRecordPath(parsedRecord, ['server_content', 'turn_complete']) === true ||
+        readRecordPath(parsedRecord, ['turnComplete']) === true ||
+        readRecordPath(parsedRecord, ['turn_complete']) === true
       const inputFinished =
-        parsed.serverContent?.inputTranscription?.finished === true ||
-        parsed.server_content?.input_transcription?.finished === true
+        readRecordPath(parsedRecord, ['serverContent', 'inputTranscription', 'finished']) ===
+          true ||
+        readRecordPath(parsedRecord, ['server_content', 'input_transcription', 'finished']) === true
       if ((inputFinished || turnComplete) && transcript.trim()) {
         clearTimeout(timeout)
         finalizeSuccess(transcript.trim())
@@ -396,6 +427,7 @@ async function transcribeWithGoogleGenerateContent(
   audioBase64: string,
   mimeType: string,
   apiKey: string,
+  signal: AbortSignal,
 ) {
   const orderedModels = getOrderedGoogleTranscriptionModels()
   for (const model of orderedModels) {
@@ -409,6 +441,7 @@ async function transcribeWithGoogleGenerateContent(
         `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
         {
           method: 'POST',
+          signal,
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             contents: [
@@ -512,13 +545,20 @@ async function transcribeWithGoogle(payload: {
   if (!apiKey) {
     throw new Error('GOOGLE_API_KEY is not configured')
   }
+  const transcriptionAudioBase64 = payload.liveAudioBase64 || payload.audioBase64
+  const transcriptionMimeType = payload.liveMimeType || payload.mimeType
   if (shouldUseGoogleLiveVoice()) {
     const liveAudioBase64 = payload.liveAudioBase64 || payload.audioBase64
     const liveMimeType = payload.liveMimeType || payload.mimeType
     const orderedLiveModels = getOrderedGoogleLiveModels()
     for (const liveModel of orderedLiveModels) {
       try {
-        const transcript = await transcribeWithGoogleLive(liveAudioBase64, liveMimeType, apiKey, liveModel)
+        const transcript = await transcribeWithGoogleLive(
+          liveAudioBase64,
+          liveMimeType,
+          apiKey,
+          liveModel,
+        )
         if (transcript.trim()) {
           appLogInfo('BW_VOICE_LIVE_MODEL_SUCCESS', 'Live API transcription succeeded', {
             provider: 'google',
@@ -533,15 +573,31 @@ async function transcribeWithGoogle(payload: {
           }
         }
       } catch (error) {
-        appLogWarn('BW_VOICE_LIVE_MODEL_ERROR', 'Live API transcription failed, trying fallback chain', {
-          provider: 'google',
-          model: liveModel,
-          error: error instanceof Error ? error.message : 'Unknown error',
-        })
+        appLogWarn(
+          'BW_VOICE_LIVE_MODEL_ERROR',
+          'Live API transcription failed, trying fallback chain',
+          {
+            provider: 'google',
+            model: liveModel,
+            error: error instanceof Error ? error.message : 'Unknown error',
+          },
+        )
       }
     }
   }
-  return transcribeWithGoogleGenerateContent(payload.audioBase64, payload.mimeType, apiKey)
+  return transcribeWithGoogleGenerateContent(
+    transcriptionAudioBase64,
+    transcriptionMimeType,
+    apiKey,
+    AbortSignal.timeout(20_000),
+  )
+}
+
+async function requireAuthenticatedVoiceUser() {
+  const session = await useAppSession()
+  if (!session.data.userId) {
+    throw new Error('Unauthorized')
+  }
 }
 
 export const transcribeVoiceFn = createServerFn({ method: 'POST' })
@@ -549,6 +605,7 @@ export const transcribeVoiceFn = createServerFn({ method: 'POST' })
   .handler(async ({ data }) => {
     const startedAt = Date.now()
     try {
+      await requireAuthenticatedVoiceUser()
       const provider = (getOptionalEnvValue('AI_PROVIDER') || 'google').toLowerCase()
       if (provider !== 'google') {
         throw new Error(

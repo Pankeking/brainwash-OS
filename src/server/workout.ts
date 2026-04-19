@@ -175,6 +175,78 @@ function parseSelectedDayKey(value: string) {
   return dayKeyFromDateInTimeZone(legacyDate, APP_TIMEZONE)
 }
 
+function getLegacyWorkoutLogDateFilter(dayKey: string) {
+  const range = getUtcRangeForDayKey(dayKey)
+  return {
+    date: {
+      $gte: range.start,
+      $lte: range.end,
+    },
+  }
+}
+
+async function findWorkoutLogsForDay(
+  userId: mongoose.Types.ObjectId,
+  dayKey: string,
+  options?: { lean?: boolean },
+) {
+  const query = WorkoutLogModel.find({
+    userId,
+    $or: [{ dayKey }, getLegacyWorkoutLogDateFilter(dayKey)],
+  })
+  if (options?.lean) {
+    return await query.lean()
+  }
+  return await query
+}
+
+async function findOrCreateWorkoutLogForDay(userId: mongoose.Types.ObjectId, dayKey: string) {
+  const existingByDayKey = await WorkoutLogModel.findOne({
+    userId,
+    dayKey,
+  })
+  if (existingByDayKey) {
+    return existingByDayKey
+  }
+
+  const weekday = getWeekdayFromDayKey(dayKey)
+  const legacyWorkoutLog = await WorkoutLogModel.findOne({
+    userId,
+    weekday,
+    ...getLegacyWorkoutLogDateFilter(dayKey),
+  })
+  if (legacyWorkoutLog) {
+    legacyWorkoutLog.dayKey = dayKey
+    return await legacyWorkoutLog.save()
+  }
+
+  const createdWorkoutLog = await WorkoutLogModel.findOneAndUpdate(
+    {
+      userId,
+      dayKey,
+    },
+    {
+      $setOnInsert: {
+        userId,
+        dayKey,
+        date: createLogTimestampForDayKey(dayKey),
+        weekday,
+        exercises: [],
+      },
+    },
+    {
+      upsert: true,
+      returnDocument: 'after',
+    },
+  )
+
+  if (!createdWorkoutLog) {
+    throw new Error('Failed to create workout log')
+  }
+
+  return createdWorkoutLog
+}
+
 function addDaysToDayKey(dayKey: string, days: number) {
   const parsed = parseDayKey(dayKey)
   const date = new Date(Date.UTC(parsed.year, parsed.month - 1, parsed.day + days))
@@ -290,8 +362,6 @@ export const getWorkoutDayFn = createServerFn({ method: 'POST' })
       await connectDB()
       const userId = await getAuthenticatedUserObjectId()
       const selectedDayKey = parseSelectedDayKey(data.selectedDay)
-      const selectedDayRange = getUtcRangeForDayKey(selectedDayKey)
-      const weekday = getWeekdayFromDayKey(selectedDayKey)
       const todayDayKey = dayKeyFromDateInTimeZone(new Date(), APP_TIMEZONE)
       const weekRange = getRollingRangeFromDayKey(todayDayKey, 7)
       const monthRange = getRollingRangeFromDayKey(todayDayKey, 30)
@@ -302,18 +372,11 @@ export const getWorkoutDayFn = createServerFn({ method: 'POST' })
         end: getUtcRangeForDayKey(currentWeekEndDayKey).end,
       }
 
-      const [categories, exerciseDocs, workoutLog, currentWeekLogs, weekRangeLogs, monthRangeLogs] =
+      const [categories, exerciseDocs, dayLogs, currentWeekLogs, weekRangeLogs, monthRangeLogs] =
         await Promise.all([
           ExerciseCategoryModel.find({ userId }).sort({ createdAt: 1 }).lean(),
           ExerciseModel.find({ userId }).sort({ createdAt: 1 }).lean(),
-          WorkoutLogModel.findOne({
-            userId,
-            weekday,
-            date: {
-              $gte: selectedDayRange.start,
-              $lte: selectedDayRange.end,
-            },
-          }).lean(),
+          findWorkoutLogsForDay(userId, selectedDayKey, { lean: true }),
           WorkoutLogModel.find({
             userId,
             date: {
@@ -422,8 +485,8 @@ export const getWorkoutDayFn = createServerFn({ method: 'POST' })
         }
       })
 
-      const logs =
-        workoutLog?.exercises.flatMap(
+      const logs = dayLogs.flatMap((workoutLog) =>
+        workoutLog.exercises.flatMap(
           (
             entry: {
               exercise: { exerciseId: mongoose.Types.ObjectId | string }
@@ -478,7 +541,8 @@ export const getWorkoutDayFn = createServerFn({ method: 'POST' })
                 ): log is NonNullable<typeof log> => Boolean(log),
               )
           },
-        ) || []
+        ),
+      )
 
       appLogInfo('BW_WORKOUT_DAY_FETCHED', 'Workout day data fetched', {
         selectedDayKey,
@@ -683,27 +747,8 @@ export const addWorkoutSetFn = createServerFn({ method: 'POST' })
     await connectDB()
     const userId = await getAuthenticatedUserObjectId()
     const selectedDayKey = parseSelectedDayKey(data.selectedDay)
-    const selectedDayRange = getUtcRangeForDayKey(selectedDayKey)
-    const weekday = getWeekdayFromDayKey(selectedDayKey)
     const exerciseId = new mongoose.Types.ObjectId(data.exerciseId)
-
-    let workoutLog = await WorkoutLogModel.findOne({
-      userId,
-      weekday,
-      date: {
-        $gte: selectedDayRange.start,
-        $lte: selectedDayRange.end,
-      },
-    })
-
-    if (!workoutLog) {
-      workoutLog = await WorkoutLogModel.create({
-        userId,
-        date: createLogTimestampForDayKey(selectedDayKey),
-        weekday,
-        exercises: [],
-      })
-    }
+    const workoutLog = await findOrCreateWorkoutLogForDay(userId, selectedDayKey)
 
     let exerciseEntry = workoutLog.exercises.find(
       (entry: { exercise: { exerciseId: mongoose.Types.ObjectId | string } }) =>
@@ -752,95 +797,94 @@ export const removeWorkoutSetFn = createServerFn({ method: 'POST' })
     await connectDB()
     const userId = await getAuthenticatedUserObjectId()
     const selectedDayKey = parseSelectedDayKey(data.selectedDay)
-    const selectedDayRange = getUtcRangeForDayKey(selectedDayKey)
-    const weekday = getWeekdayFromDayKey(selectedDayKey)
-
     const isTokenBasedLogId = data.logId.includes('|')
     const [exerciseKeyRaw, setKeyRaw] = data.logId.split(':')
+    const workoutLogs = await findWorkoutLogsForDay(userId, selectedDayKey)
 
-    const workoutLog = await WorkoutLogModel.findOne({
-      userId,
-      weekday,
-      date: {
-        $gte: selectedDayRange.start,
-        $lte: selectedDayRange.end,
-      },
-    })
-    if (!workoutLog) {
-      return { success: true }
-    }
-
-    if (!isTokenBasedLogId) {
-      const numericExerciseIndex = Number(exerciseKeyRaw)
-      const numericSetIndex = Number(setKeyRaw)
-      if (!Number.isNaN(numericExerciseIndex) && !Number.isNaN(numericSetIndex)) {
-        const legacyExercise = workoutLog.exercises[numericExerciseIndex]
-        if (!legacyExercise) {
+    for (const workoutLog of workoutLogs) {
+      if (!isTokenBasedLogId) {
+        const numericExerciseIndex = Number(exerciseKeyRaw)
+        const numericSetIndex = Number(setKeyRaw)
+        if (!Number.isNaN(numericExerciseIndex) && !Number.isNaN(numericSetIndex)) {
+          const legacyExercise = workoutLog.exercises[numericExerciseIndex]
+          if (!legacyExercise) {
+            continue
+          }
+          legacyExercise.sets.splice(numericSetIndex, 1)
+          if (legacyExercise.sets.length === 0) {
+            workoutLog.exercises.splice(numericExerciseIndex, 1)
+          }
+          if (!workoutLog.dayKey) {
+            workoutLog.dayKey = selectedDayKey
+          }
+          await workoutLog.save()
           return { success: true }
         }
-        legacyExercise.sets.splice(numericSetIndex, 1)
-        if (legacyExercise.sets.length === 0) {
-          workoutLog.exercises.splice(numericExerciseIndex, 1)
+      }
+
+      if (isTokenBasedLogId) {
+        const [exerciseIdToken, loggedAtMsToken, setTypeToken, valueToken] = data.logId.split('|')
+        const exerciseIndex = workoutLog.exercises.findIndex(
+          (entry: { exercise: { exerciseId: mongoose.Types.ObjectId | string } }) =>
+            String(entry.exercise.exerciseId) === exerciseIdToken,
+        )
+        if (exerciseIndex === -1) {
+          continue
+        }
+        const exercise = workoutLog.exercises[exerciseIndex]
+        const loggedAtMs = Number(loggedAtMsToken)
+        const value = Number(valueToken)
+        const setIndex = exercise.sets.findIndex(
+          (setEntry: { loggedAt?: Date; type?: SetType; reps?: number; duration?: number }) => {
+            const setLoggedAtMs = setEntry.loggedAt ? new Date(setEntry.loggedAt).getTime() : NaN
+            const setValue =
+              setTypeToken === 'timed' ? Number(setEntry.duration || 0) : Number(setEntry.reps || 0)
+            const setTypeMatches =
+              (setTypeToken === 'timed' && setEntry.type === SetType.TIMED) ||
+              (setTypeToken === 'reps' && setEntry.type === SetType.REPS)
+            return setTypeMatches && setValue === value && setLoggedAtMs === loggedAtMs
+          },
+        )
+        if (setIndex === -1) {
+          continue
+        }
+        exercise.sets.splice(setIndex, 1)
+        if (exercise.sets.length === 0) {
+          workoutLog.exercises.splice(exerciseIndex, 1)
+        }
+        if (!workoutLog.dayKey) {
+          workoutLog.dayKey = selectedDayKey
         }
         await workoutLog.save()
         return { success: true }
       }
-    }
 
-    if (isTokenBasedLogId) {
-      const [exerciseIdToken, loggedAtMsToken, setTypeToken, valueToken] = data.logId.split('|')
       const exerciseIndex = workoutLog.exercises.findIndex(
         (entry: { exercise: { exerciseId: mongoose.Types.ObjectId | string } }) =>
-          String(entry.exercise.exerciseId) === exerciseIdToken,
+          String(entry.exercise.exerciseId) === exerciseKeyRaw,
       )
       if (exerciseIndex === -1) {
-        return { success: true }
+        continue
       }
       const exercise = workoutLog.exercises[exerciseIndex]
-      const loggedAtMs = Number(loggedAtMsToken)
-      const value = Number(valueToken)
       const setIndex = exercise.sets.findIndex(
-        (setEntry: { loggedAt?: Date; type?: SetType; reps?: number; duration?: number }) => {
-          const setLoggedAtMs = setEntry.loggedAt ? new Date(setEntry.loggedAt).getTime() : NaN
-          const setValue =
-            setTypeToken === 'timed' ? Number(setEntry.duration || 0) : Number(setEntry.reps || 0)
-          const setTypeMatches =
-            (setTypeToken === 'timed' && setEntry.type === SetType.TIMED) ||
-            (setTypeToken === 'reps' && setEntry.type === SetType.REPS)
-          return setTypeMatches && setValue === value && setLoggedAtMs === loggedAtMs
-        },
+        (setEntry: { _id?: mongoose.Types.ObjectId | string }) =>
+          String(setEntry._id) === setKeyRaw,
       )
       if (setIndex === -1) {
-        return { success: true }
+        continue
       }
       exercise.sets.splice(setIndex, 1)
       if (exercise.sets.length === 0) {
         workoutLog.exercises.splice(exerciseIndex, 1)
       }
+      if (!workoutLog.dayKey) {
+        workoutLog.dayKey = selectedDayKey
+      }
       await workoutLog.save()
       return { success: true }
     }
 
-    const exerciseIndex = workoutLog.exercises.findIndex(
-      (entry: { exercise: { exerciseId: mongoose.Types.ObjectId | string } }) =>
-        String(entry.exercise.exerciseId) === exerciseKeyRaw,
-    )
-    if (exerciseIndex === -1) {
-      return { success: true }
-    }
-    const exercise = workoutLog.exercises[exerciseIndex]
-    const setIndex = exercise.sets.findIndex(
-      (setEntry: { _id?: mongoose.Types.ObjectId | string }) => String(setEntry._id) === setKeyRaw,
-    )
-    if (setIndex === -1) {
-      return { success: true }
-    }
-    exercise.sets.splice(setIndex, 1)
-    if (exercise.sets.length === 0) {
-      workoutLog.exercises.splice(exerciseIndex, 1)
-    }
-
-    await workoutLog.save()
     return { success: true }
   })
 

@@ -147,6 +147,17 @@ function parseDayKey(value: string) {
   return { year, month, day, key: formatDayKey(year, month, day) }
 }
 
+function resolveSelectedDayKey(selectedDay?: string) {
+  if (!selectedDay) {
+    return dayKeyFromDateInTimeZone(new Date(), APP_TIMEZONE)
+  }
+  try {
+    return parseDayKey(selectedDay).key
+  } catch {
+    return dayKeyFromDateInTimeZone(new Date(), APP_TIMEZONE)
+  }
+}
+
 function getUtcRangeForDayKey(dayKey: string) {
   const parsed = parseDayKey(dayKey)
   const start = zonedDateTimeToUtc(parsed.year, parsed.month, parsed.day, 0, 0, 0, 0, APP_TIMEZONE)
@@ -245,7 +256,11 @@ function parseIntentFallback(message: string): AssistantIntent {
 }
 
 function normalizeName(input: string) {
-  return input.toLowerCase().replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim()
+  return input
+    .toLowerCase()
+    .replace(/[^a-z0-9 ]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
 }
 
 function getTokenSet(value: string) {
@@ -330,9 +345,7 @@ function buildSuggestions(payload: {
     suggestions.push({
       id: 'suggestion-1',
       label:
-        payload.setType === 'timed'
-          ? `${value} sec of ${primary}`
-          : `${value} reps of ${primary}`,
+        payload.setType === 'timed' ? `${value} sec of ${primary}` : `${value} reps of ${primary}`,
       exerciseName: primary,
       setType: payload.setType,
       value,
@@ -371,10 +384,11 @@ async function logAssistantSet(payload: {
   exerciseName: string
   setType: 'reps' | 'timed'
   value: number
+  selectedDay?: string
   activeTab?: 'time' | 'categories' | 'exercises' | 'history'
   model: string | null
 }) {
-  const contextSelectedDay = dayKeyFromDateInTimeZone(new Date(), APP_TIMEZONE)
+  const contextSelectedDay = resolveSelectedDayKey(payload.selectedDay)
   if (payload.activeTab && payload.activeTab !== 'exercises') {
     return {
       reply: 'You are not in exercises tab. Switch to exercises and try again.',
@@ -384,7 +398,7 @@ async function logAssistantSet(payload: {
       suggestions: [] as AssistantSuggestion[],
     }
   }
-  const targetDayKey = dayKeyFromDateInTimeZone(new Date(), APP_TIMEZONE)
+  const targetDayKey = contextSelectedDay
   const value = Math.max(1, Math.floor(payload.value))
   const normalizedTarget = normalizeName(payload.exerciseName).replace(/\s+/g, '')
   const matchedExercise = payload.exercises.find(
@@ -409,23 +423,45 @@ async function logAssistantSet(payload: {
     }
   }
   const weekday = getWeekdayFromDayKey(targetDayKey)
-  const range = getUtcRangeForDayKey(targetDayKey)
   const exerciseObjectId = new mongoose.Types.ObjectId(String(matchedExercise._id))
   let workoutLog = await WorkoutLogModel.findOne({
     userId: payload.userId,
-    weekday,
-    date: {
-      $gte: range.start,
-      $lte: range.end,
-    },
+    dayKey: targetDayKey,
   })
   if (!workoutLog) {
-    workoutLog = await WorkoutLogModel.create({
+    const range = getUtcRangeForDayKey(targetDayKey)
+    const legacyWorkoutLog = await WorkoutLogModel.findOne({
       userId: payload.userId,
-      date: createLogTimestampForDayKey(targetDayKey),
       weekday,
-      exercises: [],
+      date: {
+        $gte: range.start,
+        $lte: range.end,
+      },
     })
+    if (legacyWorkoutLog) {
+      legacyWorkoutLog.dayKey = targetDayKey
+      workoutLog = await legacyWorkoutLog.save()
+    } else {
+      workoutLog = await WorkoutLogModel.findOneAndUpdate(
+        {
+          userId: payload.userId,
+          dayKey: targetDayKey,
+        },
+        {
+          $setOnInsert: {
+            userId: payload.userId,
+            dayKey: targetDayKey,
+            date: createLogTimestampForDayKey(targetDayKey),
+            weekday,
+            exercises: [],
+          },
+        },
+        {
+          upsert: true,
+          returnDocument: 'after',
+        },
+      )
+    }
   }
   let exerciseEntry = workoutLog.exercises.find(
     (entry: { exercise: { exerciseId: mongoose.Types.ObjectId | string } }) =>
@@ -454,7 +490,8 @@ async function logAssistantSet(payload: {
   }
   const loggedAtMs = new Date(lastSet.loggedAt || new Date()).getTime()
   const setTypeToken = payload.setType === 'timed' ? 'timed' : 'reps'
-  const valueToken = payload.setType === 'timed' ? Number(lastSet.duration || value) : Number(lastSet.reps || value)
+  const valueToken =
+    payload.setType === 'timed' ? Number(lastSet.duration || value) : Number(lastSet.reps || value)
   await workoutLog.save()
   appLogInfo('BW_SET_LOG_MCP', 'Set logged from assistant MCP', {
     source: 'mcp',
@@ -637,7 +674,7 @@ export const assistantChatFn = createServerFn({ method: 'POST' })
       await connectDB()
       const userId = await getAuthenticatedUserObjectId()
 
-      const contextSelectedDay = dayKeyFromDateInTimeZone(new Date(), APP_TIMEZONE)
+      const contextSelectedDay = resolveSelectedDayKey(data.context?.selectedDay)
       const exercises = await ExerciseModel.find({ userId }).lean()
       const exerciseNames = exercises.map((exercise) => exercise.name)
       appLogInfo('BW_MCP_MESSAGE_RECEIVED', 'Assistant message received', {
@@ -657,6 +694,7 @@ export const assistantChatFn = createServerFn({ method: 'POST' })
           exerciseName: quickIntent.exerciseName,
           setType: quickIntent.setType,
           value: quickIntent.value,
+          selectedDay: contextSelectedDay,
           activeTab: data.context?.activeTab,
           model: 'fast-path',
         })
@@ -706,10 +744,7 @@ export const assistantChatFn = createServerFn({ method: 'POST' })
             })
           : []
         return {
-          reply:
-            suggestions.length > 0
-              ? 'Did you mean one of these?'
-              : inferredIntent.reply,
+          reply: suggestions.length > 0 ? 'Did you mean one of these?' : inferredIntent.reply,
           didLogSet: false,
           selectedDay: contextSelectedDay,
           undo: null,
@@ -725,6 +760,7 @@ export const assistantChatFn = createServerFn({ method: 'POST' })
         exerciseName: inferredIntent.exerciseName,
         setType: inferredIntent.setType,
         value: inferredIntent.value,
+        selectedDay: contextSelectedDay,
         activeTab: data.context?.activeTab,
         model: providerResolution.usedModel,
       })
@@ -759,6 +795,7 @@ export const assistantLogDirectFn = createServerFn({ method: 'POST' })
         exerciseName: data.exerciseName,
         setType: data.setType,
         value: data.value,
+        selectedDay: resolveSelectedDayKey(data.context?.selectedDay),
         activeTab: data.context?.activeTab,
         model: 'direct-action',
       })
