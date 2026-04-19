@@ -234,8 +234,7 @@ export default function Chat({ context, onWorkoutDataChanged }: ChatProps) {
       mimeType: string
       liveAudioBase64?: string
       liveMimeType?: string
-    }) =>
-      transcribeVoiceFn({ data: payload }),
+    }) => transcribeVoiceFn({ data: payload }),
     onSuccess: (data) => {
       const transcript = data.transcript.trim()
       if (!transcript) {
@@ -278,9 +277,7 @@ export default function Chat({ context, onWorkoutDataChanged }: ChatProps) {
       .reverse()
       .find(
         (item) =>
-          item.role === 'assistant' &&
-          (item.suggestions?.length || 0) > 0 &&
-          !item.suggestionsUsed,
+          item.role === 'assistant' && (item.suggestions?.length || 0) > 0 && !item.suggestionsUsed,
       )
     const isAffirmative = /^(yes|yeah|yep|si|sure|correct|exactly|ok|okay)$/i.test(message)
     if (lastAssistantWithSuggestions && isAffirmative) {
@@ -294,9 +291,7 @@ export default function Chat({ context, onWorkoutDataChanged }: ChatProps) {
         })
         patchMessages((currentMessages) =>
           currentMessages.map((item) =>
-            item.id === lastAssistantWithSuggestions.id
-              ? { ...item, suggestionsUsed: true }
-              : item,
+            item.id === lastAssistantWithSuggestions.id ? { ...item, suggestionsUsed: true } : item,
           ),
         )
         directLogMutation.mutate({
@@ -356,11 +351,7 @@ export default function Chat({ context, onWorkoutDataChanged }: ChatProps) {
   })
 
   const directLogMutation = useMutation({
-    mutationFn: (payload: {
-      exerciseName: string
-      setType: 'reps' | 'timed'
-      value: number
-    }) =>
+    mutationFn: (payload: { exerciseName: string; setType: 'reps' | 'timed'; value: number }) =>
       assistantLogDirectFn({
         data: {
           ...payload,
@@ -664,27 +655,24 @@ export default function Chat({ context, onWorkoutDataChanged }: ChatProps) {
     }
   }
 
-  useEffect(
-    () => {
-      try {
-        const raw = localStorage.getItem(CHAT_HISTORY_STORAGE_KEY)
-        if (!raw) {
-          return
-        }
-        const parsed = JSON.parse(raw) as ChatThread[]
-        if (!Array.isArray(parsed)) {
-          return
-        }
-        const safeThreads = parsed
-          .filter((thread) => thread && typeof thread.id === 'string')
-          .slice(0, 3)
-        setThreads(safeThreads)
-      } catch {
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(CHAT_HISTORY_STORAGE_KEY)
+      if (!raw) {
         return
       }
-    },
-    [],
-  )
+      const parsed = JSON.parse(raw) as ChatThread[]
+      if (!Array.isArray(parsed)) {
+        return
+      }
+      const safeThreads = parsed
+        .filter((thread) => thread && typeof thread.id === 'string')
+        .slice(0, 3)
+      setThreads(safeThreads)
+    } catch {
+      return
+    }
+  }, [])
 
   useEffect(
     () => () => {
@@ -820,7 +808,9 @@ export default function Chat({ context, onWorkoutDataChanged }: ChatProps) {
                     <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
                     Recording
                   </div>
-                  <div className="text-[10px] font-mono font-black text-red-300">{recordingSeconds}s</div>
+                  <div className="text-[10px] font-mono font-black text-red-300">
+                    {recordingSeconds}s
+                  </div>
                 </div>
               )}
               {!isListening && isMicPressing && (
@@ -840,43 +830,43 @@ export default function Chat({ context, onWorkoutDataChanged }: ChatProps) {
                 className="flex-1 bg-[#2A333E] border border-slate-700 rounded-xl px-3 py-2.5 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-orange-500/40"
               />
               <button
-              onPointerDown={(e) => {
-                e.preventDefault()
-                e.currentTarget.setPointerCapture(e.pointerId)
-                pointerIdRef.current = e.pointerId
-                setIsMicPressing(true)
-                clearHoldStartTimeout()
-                holdStartTimeoutRef.current = setTimeout(() => {
-                  void startListening()
-                }, 500)
-              }}
-              onPointerUp={(e) => {
-                e.preventDefault()
-                if (pointerIdRef.current === e.pointerId) {
-                  pointerIdRef.current = null
-                }
-                setIsMicPressing(false)
-                stopListening()
-              }}
-              onPointerCancel={(e) => {
-                e.preventDefault()
-                if (pointerIdRef.current === e.pointerId) {
-                  pointerIdRef.current = null
-                }
-                setIsMicPressing(false)
-                stopListening()
-              }}
-              className={`w-11 h-11 rounded-xl border flex items-center justify-center transition-all select-none touch-none ${
-                isListening
-                  ? 'bg-red-600 border-red-500 text-white scale-110'
-                  : isMicPressing
-                    ? 'bg-orange-600 border-orange-500 text-white scale-110'
-                    : 'bg-[#2A333E] border-slate-700 text-slate-200 hover:bg-[#364252] hover:scale-105'
-              }`}
-              style={{ WebkitTouchCallout: 'none' }}
-              onContextMenu={(e) => e.preventDefault()}
-            >
-              {isListening ? <MicOff size={16} /> : <Mic size={16} />}
+                onPointerDown={(e) => {
+                  e.preventDefault()
+                  e.currentTarget.setPointerCapture(e.pointerId)
+                  pointerIdRef.current = e.pointerId
+                  setIsMicPressing(true)
+                  clearHoldStartTimeout()
+                  holdStartTimeoutRef.current = setTimeout(() => {
+                    void startListening()
+                  }, 500)
+                }}
+                onPointerUp={(e) => {
+                  e.preventDefault()
+                  if (pointerIdRef.current === e.pointerId) {
+                    pointerIdRef.current = null
+                  }
+                  setIsMicPressing(false)
+                  stopListening()
+                }}
+                onPointerCancel={(e) => {
+                  e.preventDefault()
+                  if (pointerIdRef.current === e.pointerId) {
+                    pointerIdRef.current = null
+                  }
+                  setIsMicPressing(false)
+                  stopListening()
+                }}
+                className={`w-11 h-11 rounded-xl border flex items-center justify-center transition-all select-none touch-none ${
+                  isListening
+                    ? 'bg-red-600 border-red-500 text-white scale-110'
+                    : isMicPressing
+                      ? 'bg-orange-600 border-orange-500 text-white scale-110'
+                      : 'bg-[#2A333E] border-slate-700 text-slate-200 hover:bg-[#364252] hover:scale-105'
+                }`}
+                style={{ WebkitTouchCallout: 'none' }}
+                onContextMenu={(e) => e.preventDefault()}
+              >
+                {isListening ? <MicOff size={16} /> : <Mic size={16} />}
               </button>
               <button
                 onClick={handleSend}

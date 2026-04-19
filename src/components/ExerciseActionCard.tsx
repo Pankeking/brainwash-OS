@@ -217,7 +217,9 @@ export default function ExerciseActionCard({
                     <div className="flex items-center justify-between gap-2 text-[8px] font-black uppercase tracking-widest">
                       <span className="text-slate-500">Weekly</span>
                       <span className={hasWeeklyGoal ? 'text-orange-400' : 'text-slate-500'}>
-                        {hasWeeklyGoal ? `${weekSetsDone} / ${weeklySetGoal}` : `${weekSetsDone} / -`}
+                        {hasWeeklyGoal
+                          ? `${weekSetsDone} / ${weeklySetGoal}`
+                          : `${weekSetsDone} / -`}
                       </span>
                     </div>
                     <div className="mt-1 h-1.5 rounded-full bg-[#1A1F26] overflow-hidden border border-slate-700/40">
