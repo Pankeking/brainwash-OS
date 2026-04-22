@@ -19,6 +19,7 @@ export interface WorkoutExercise {
   preferredSetType: SetType
   weeklySetGoal: number | null
   weeklyVolumeGoal: number | null
+  setTargetValue: number | null
   weekSetsDone: number
   weekVolumeDone: number
   stats: {
@@ -81,10 +82,36 @@ export interface BodyMetricLatestValue {
   loggedAt: string
 }
 
+export interface BodyMetricStatsValue {
+  value: number
+  loggedAt: string
+}
+
+export interface BodyMetricStatsBucket {
+  label: string
+  low: number
+  avg: number
+  high: number
+}
+
+export interface BodyMetricStats {
+  metricKey: string
+  label: string
+  kind: 'weight' | 'size'
+  unit: 'kg' | 'cm'
+  weekly: BodyMetricStatsBucket[]
+  monthly: BodyMetricStatsBucket[]
+  overallHigh: BodyMetricStatsValue | null
+  overallLow: BodyMetricStatsValue | null
+  firstRecorded: BodyMetricStatsValue | null
+  lastRecorded: BodyMetricStatsValue | null
+}
+
 export interface BodyMetricsDayData {
   definitions: BodyMetricDefinition[]
   entries: BodyMetricEntry[]
   latest: BodyMetricLatestValue[]
+  stats: BodyMetricStats[]
 }
 
 export type WorkoutTab = 'time' | 'categories' | 'exercises' | 'body' | 'history'

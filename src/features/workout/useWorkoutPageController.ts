@@ -221,7 +221,7 @@ export function useWorkoutPageController(loaderData: WorkoutLoaderData) {
   const handleUpdateExerciseWeeklyGoal = (
     exerciseId: string,
     weeklySetGoal: number | null,
-    weeklyVolumeGoal: number | null,
+    setTargetValue: number | null,
     preferredSetType: SetType,
   ) => {
     updateExerciseWeeklyGoalMutation.mutate({
@@ -229,7 +229,7 @@ export function useWorkoutPageController(loaderData: WorkoutLoaderData) {
         exerciseId,
         preferredSetType: preferredSetType === SetType.TIMED ? 'timed' : 'reps',
         weeklySetGoal,
-        weeklyVolumeGoal,
+        setTargetValue,
       },
     })
   }

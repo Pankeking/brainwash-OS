@@ -17,7 +17,7 @@ export interface ExerciseActionCardProps {
   onToggleCategory: (categoryId: string) => void
   onUpdateWeeklyGoal: (
     weeklySetGoal: number | null,
-    weeklyVolumeGoal: number | null,
+    setTargetValue: number | null,
     preferredSetType: SetType,
   ) => void
   onToggleExpand: (id: string) => void
@@ -25,9 +25,8 @@ export interface ExerciseActionCardProps {
   count: number
   preferredSetType: SetType
   weeklySetGoal: number | null
-  weeklyVolumeGoal: number | null
+  setTargetValue: number | null
   weekSetsDone: number
-  weekVolumeDone: number
   stats: {
     week: { best: number | null; avg: number | null; worst: number | null }
     month: { best: number | null; avg: number | null; worst: number | null }

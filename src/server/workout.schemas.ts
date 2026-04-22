@@ -30,6 +30,7 @@ export const updateExerciseWeeklyGoalInputSchema = z.object({
   exerciseId: z.string(),
   weeklySetGoal: z.number().int().min(1).max(999).nullable(),
   weeklyVolumeGoal: z.number().int().min(1).max(99999).nullable().optional(),
+  setTargetValue: z.number().int().min(1).max(99999).nullable().optional(),
   preferredSetType: z.enum(['reps', 'timed']).optional(),
 })
 

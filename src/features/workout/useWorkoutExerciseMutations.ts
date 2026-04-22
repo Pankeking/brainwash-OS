@@ -52,6 +52,7 @@ export function useWorkoutExerciseMutations({
           preferredSetType: SetType.REPS,
           weeklySetGoal: null,
           weeklyVolumeGoal: null,
+          setTargetValue: null,
           weekSetsDone: 0,
           weekVolumeDone: 0,
           stats: {
@@ -203,6 +204,7 @@ export function useWorkoutExerciseMutations({
         preferredSetType?: 'reps' | 'timed'
         weeklySetGoal: number | null
         weeklyVolumeGoal?: number | null
+        setTargetValue?: number | null
       }
     }) => updateWorkoutExerciseWeeklyGoalFn(input),
     onMutate: async (variables) => {
@@ -227,6 +229,10 @@ export function useWorkoutExerciseMutations({
                         weeklySetGoal: variables.data.weeklySetGoal,
                         weeklyVolumeGoal:
                           variables.data.weeklyVolumeGoal ?? exercise.weeklyVolumeGoal,
+                        setTargetValue:
+                          variables.data.setTargetValue !== undefined
+                            ? variables.data.setTargetValue
+                            : exercise.setTargetValue,
                       }
                     : exercise,
                 ),

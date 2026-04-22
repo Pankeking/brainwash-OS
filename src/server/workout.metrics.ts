@@ -2,6 +2,7 @@ import { createServerFn } from '@tanstack/react-start'
 
 import connectDB from './db'
 import { appLogInfo } from './logger'
+import { buildBodyMetricProgressStats } from './bodyMetrics.stats'
 import {
   getBodyMetricDefinitionsForUser,
   findBodyMeasurementLogsForRange,
@@ -19,6 +20,7 @@ import {
 } from './workout.schemas'
 import { addDaysToDayKey, parseSelectedDayKey } from './workout.utils'
 import { BodyMetricDefinitionModel } from '~/models/BodyMetricDefinition.model'
+import { BodyMeasurementLogModel } from '~/models/BodyMeasurementLog.model'
 
 export const getBodyMetricsDayFn = createServerFn({ method: 'POST' })
   .inputValidator(workoutDayInputSchema)
@@ -28,12 +30,29 @@ export const getBodyMetricsDayFn = createServerFn({ method: 'POST' })
     const selectedDayKey = parseSelectedDayKey(data.selectedDay)
     const historyStartDayKey = addDaysToDayKey(selectedDayKey, -29)
     const definitions = await getBodyMetricDefinitionsForUser(userId)
-
-    const logs = await findBodyMeasurementLogsForRange(userId, historyStartDayKey, selectedDayKey)
+    const [logs, allLogs] = await Promise.all([
+      findBodyMeasurementLogsForRange(userId, historyStartDayKey, selectedDayKey),
+      BodyMeasurementLogModel.find(
+        {
+          userId,
+          'measurements.0': { $exists: true },
+        },
+        {
+          dayKey: 1,
+          measurements: 1,
+        },
+      )
+        .sort({ date: -1 })
+        .lean(),
+    ])
     const selectedDayLog = logs.find((log) => log.dayKey === selectedDayKey)
     const latestByMetric = new Map<
       string,
       { value: number; unit: 'kg' | 'cm'; loggedAt: string; label: string }
+    >()
+    const metricPoints = new Map<
+      string,
+      Array<{ dayKey: string; value: number; loggedAt: string }>
     >()
 
     for (const log of logs) {
@@ -52,6 +71,22 @@ export const getBodyMetricsDayFn = createServerFn({ method: 'POST' })
             label: measurement.label,
           })
         }
+      }
+    }
+    for (const log of allLogs) {
+      for (const measurement of (log.measurements || []) as Array<{
+        metricKey: string
+        value: number
+        loggedAt: Date
+      }>) {
+        metricPoints.set(measurement.metricKey, [
+          ...(metricPoints.get(measurement.metricKey) || []),
+          {
+            dayKey: log.dayKey,
+            value: measurement.value,
+            loggedAt: new Date(measurement.loggedAt).toISOString(),
+          },
+        ])
       }
     }
 
@@ -80,6 +115,13 @@ export const getBodyMetricsDayFn = createServerFn({ method: 'POST' })
       latest: Array.from(latestByMetric.entries()).map(([metricKey, value]) => ({
         metricKey,
         ...value,
+      })),
+      stats: definitions.map((definition) => ({
+        metricKey: definition.key,
+        label: definition.label,
+        kind: definition.kind,
+        unit: definition.unit,
+        ...buildBodyMetricProgressStats(selectedDayKey, metricPoints.get(definition.key) || []),
       })),
     }
   })

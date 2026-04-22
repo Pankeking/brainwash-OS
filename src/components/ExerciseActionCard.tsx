@@ -7,6 +7,7 @@ import { ExerciseCardDeleteConfirm } from '~/features/workout/exercise-card/Exer
 import { ExerciseCardDetails } from '~/features/workout/exercise-card/ExerciseCardDetails'
 import { ExerciseCardHeader } from '~/features/workout/exercise-card/ExerciseCardHeader'
 import type { ExerciseActionCardProps } from '~/features/workout/exercise-card/exercise-card.types'
+import { formatTimedValue } from '~/features/workout/workout.formatting'
 
 function getInitialStoredValue(storageKey: string, fallback: number) {
   if (typeof window === 'undefined') {
@@ -38,9 +39,8 @@ export default function ExerciseActionCard({
   count,
   preferredSetType,
   weeklySetGoal,
-  weeklyVolumeGoal,
+  setTargetValue,
   weekSetsDone,
-  weekVolumeDone,
   stats,
 }: ExerciseActionCardProps) {
   const repsStorageKey = useMemo(() => `workout-last-value:${id}:${SetType.REPS}`, [id])
@@ -50,10 +50,10 @@ export default function ExerciseActionCard({
 
   const [editName, setEditName] = useState(name)
   const [goalDraft, setGoalDraft] = useState(weeklySetGoal ?? 10)
-  const [volumeGoalDraft, setVolumeGoalDraft] = useState(weeklyVolumeGoal ?? 100)
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
   const [repsValue, setRepsValue] = useState(10)
+  const [setTargetDraft, setSetTargetDraft] = useState(setTargetValue ? String(setTargetValue) : '')
   const [setType, setSetType] = useState(preferredSetType)
   const [storageReady, setStorageReady] = useState(false)
   const [timedValue, setTimedValue] = useState(30)
@@ -64,6 +64,16 @@ export default function ExerciseActionCard({
     hasWeeklyGoal && weeklySetGoal
       ? Math.min(100, Math.round((weekSetsDone / weeklySetGoal) * 100))
       : 0
+  const setTargetPreview =
+    setTargetDraft && Number.isFinite(Number(setTargetDraft)) && Number(setTargetDraft) > 0
+      ? setType === SetType.TIMED
+        ? formatTimedValue(Math.round(Number(setTargetDraft)))
+        : String(Math.round(Number(setTargetDraft)))
+      : typeof setTargetValue === 'number'
+        ? setType === SetType.TIMED
+          ? formatTimedValue(setTargetValue)
+          : String(setTargetValue)
+        : null
   const orderedCategories = useMemo(() => sortCategoriesByColor(allCategories), [allCategories])
   const orderedCategoryIds = useMemo(
     () =>
@@ -140,12 +150,12 @@ export default function ExerciseActionCard({
   }, [weeklySetGoal])
 
   useEffect(() => {
-    setVolumeGoalDraft(weeklyVolumeGoal ?? 100)
-  }, [weeklyVolumeGoal])
-
-  useEffect(() => {
     setSetType(preferredSetType)
   }, [preferredSetType])
+
+  useEffect(() => {
+    setSetTargetDraft(setTargetValue ? String(setTargetValue) : '')
+  }, [setTargetValue])
 
   return (
     <div
@@ -201,19 +211,18 @@ export default function ExerciseActionCard({
             onAdd={onAdd}
             onSetConfirmingDelete={setIsConfirmingDelete}
             onSetGoalDraft={setGoalDraft}
-            onSetVolumeGoalDraft={setVolumeGoalDraft}
+            onSetTargetDraft={setSetTargetDraft}
             onSetType={setSetType}
             onToggleCategory={onToggleCategory}
             onUpdateWeeklyGoal={onUpdateWeeklyGoal}
             orderedCategoryIds={orderedCategoryIds}
+            setTargetDraft={setTargetDraft}
+            setTargetPreview={setTargetPreview}
             setType={setType}
             stats={stats}
             tempValue={tempValue}
-            volumeGoalDraft={volumeGoalDraft}
             weekSetsDone={weekSetsDone}
-            weekVolumeDone={weekVolumeDone}
             weeklySetGoal={weeklySetGoal}
-            weeklyVolumeGoal={weeklyVolumeGoal}
           />
         )}
       </div>

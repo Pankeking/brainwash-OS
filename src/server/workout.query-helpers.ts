@@ -68,6 +68,7 @@ export function mapWorkoutExercises(payload: {
     preferredSetType?: 'reps' | 'timed' | null
     weeklySetGoal?: number | null
     weeklyVolumeGoal?: number | null
+    setTargetValue?: number | null
   }>
   monthSetsByExercise: Map<string, FlatSetRecord[]>
   rollingWeekSetsByExercise: Map<string, FlatSetRecord[]>
@@ -91,6 +92,8 @@ export function mapWorkoutExercises(payload: {
       weeklySetGoal: Number.isFinite(parsedWeeklyGoal) ? parsedWeeklyGoal : null,
       weeklyVolumeGoal:
         typeof exercise.weeklyVolumeGoal === 'number' ? Number(exercise.weeklyVolumeGoal) : null,
+      setTargetValue:
+        typeof exercise.setTargetValue === 'number' ? Number(exercise.setTargetValue) : null,
       weekSetsDone: weekSetRecords.length,
       weekVolumeDone: payload.weekVolumeByExercise.get(id) || 0,
       stats: {

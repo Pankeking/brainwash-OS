@@ -25,7 +25,7 @@ interface WorkoutExercisesTabProps {
   onUpdateExerciseWeeklyGoal: (
     exerciseId: string,
     weeklySetGoal: number | null,
-    weeklyVolumeGoal: number | null,
+    setTargetValue: number | null,
     preferredSetType: SetType,
   ) => void
 }
@@ -102,11 +102,11 @@ export function WorkoutExercisesTab({
             onRemove={() => onRemoveExercise(exercise.id)}
             onRename={(nextName) => onRenameExercise(exercise.id, nextName)}
             onToggleCategory={(categoryId) => onToggleExerciseCategory(exercise.id, categoryId)}
-            onUpdateWeeklyGoal={(weeklySetGoal, weeklyVolumeGoal, preferredSetType) =>
+            onUpdateWeeklyGoal={(weeklySetGoal, setTargetValue, preferredSetType) =>
               onUpdateExerciseWeeklyGoal(
                 exercise.id,
                 weeklySetGoal,
-                weeklyVolumeGoal,
+                setTargetValue,
                 preferredSetType,
               )
             }
@@ -117,9 +117,8 @@ export function WorkoutExercisesTab({
             count={logCountByExercise.get(exercise.id) || 0}
             weeklySetGoal={exercise.weeklySetGoal}
             preferredSetType={exercise.preferredSetType}
-            weeklyVolumeGoal={exercise.weeklyVolumeGoal}
+            setTargetValue={exercise.setTargetValue}
             weekSetsDone={exercise.weekSetsDone}
-            weekVolumeDone={exercise.weekVolumeDone}
             stats={exercise.stats}
           />
         ))}

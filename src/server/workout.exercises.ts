@@ -94,6 +94,7 @@ export const updateWorkoutExerciseWeeklyGoalFn = createServerFn({ method: 'POST'
           ...(data.weeklyVolumeGoal !== undefined
             ? { weeklyVolumeGoal: data.weeklyVolumeGoal }
             : {}),
+          ...(data.setTargetValue !== undefined ? { setTargetValue: data.setTargetValue } : {}),
           ...(data.preferredSetType ? { preferredSetType: data.preferredSetType } : {}),
         },
       },
@@ -104,6 +105,7 @@ export const updateWorkoutExerciseWeeklyGoalFn = createServerFn({ method: 'POST'
       source: 'user',
       exerciseId: data.exerciseId,
       weeklySetGoal: data.weeklySetGoal,
+      setTargetValue: data.setTargetValue,
     })
 
     return {
@@ -117,6 +119,7 @@ export const updateWorkoutExerciseWeeklyGoalFn = createServerFn({ method: 'POST'
       weeklySetGoal: typeof updated?.weeklySetGoal === 'number' ? updated.weeklySetGoal : null,
       weeklyVolumeGoal:
         typeof updated?.weeklyVolumeGoal === 'number' ? updated.weeklyVolumeGoal : null,
+      setTargetValue: typeof updated?.setTargetValue === 'number' ? updated.setTargetValue : null,
     }
   })
 

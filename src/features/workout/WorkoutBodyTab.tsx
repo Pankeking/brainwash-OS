@@ -2,13 +2,20 @@ import { Check, PlusCircle, Ruler, Trash2, Weight } from 'lucide-react'
 
 import { formatMetricValue } from '~/lib/number-input'
 
-import type { BodyMetricDefinition, BodyMetricEntry, BodyMetricLatestValue } from './workout.types'
+import { BodyMetricProgressCard } from './BodyMetricProgressCard'
+import type {
+  BodyMetricDefinition,
+  BodyMetricEntry,
+  BodyMetricLatestValue,
+  BodyMetricStats,
+} from './workout.types'
 
 interface WorkoutBodyTabProps {
   definitions: BodyMetricDefinition[]
   draftValues: Record<string, string>
   entries: BodyMetricEntry[]
   latest: BodyMetricLatestValue[]
+  stats: BodyMetricStats[]
   newMetricKind: 'weight' | 'size'
   newMetricLabel: string
   onChangeDraft: (metricKey: string, value: string) => void
@@ -25,6 +32,7 @@ export function WorkoutBodyTab({
   draftValues,
   entries,
   latest,
+  stats,
   newMetricKind,
   newMetricLabel,
   onChangeDraft,
@@ -36,6 +44,7 @@ export function WorkoutBodyTab({
   onSetNewMetricLabel,
 }: WorkoutBodyTabProps) {
   const latestByMetric = new Map(latest.map((item) => [item.metricKey, item]))
+  const statsByMetric = new Map(stats.map((item) => [item.metricKey, item]))
   const groupedDefinitions = {
     weight: definitions.filter((metric) => metric.kind === 'weight'),
     size: definitions.filter((metric) => metric.kind === 'size'),
@@ -43,6 +52,7 @@ export function WorkoutBodyTab({
 
   const renderMetricCard = (definition: BodyMetricDefinition) => {
     const latestValue = latestByMetric.get(definition.key)
+    const metricStats = statsByMetric.get(definition.key)
 
     return (
       <div key={definition.key} className="rounded-2xl border border-slate-700 bg-[#2A333E] p-3">
@@ -91,6 +101,7 @@ export function WorkoutBodyTab({
             </button>
           </div>
         ) : null}
+        {metricStats ? <BodyMetricProgressCard stats={metricStats} /> : null}
       </div>
     )
   }

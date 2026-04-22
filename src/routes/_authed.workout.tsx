@@ -126,6 +126,7 @@ function WorkoutView() {
               draftValues={controller.metricDrafts}
               entries={controller.bodyMetricsData?.entries || []}
               latest={controller.bodyMetricsData?.latest || []}
+              stats={controller.bodyMetricsData?.stats || []}
               newMetricKind={controller.newBodyMetricKind}
               newMetricLabel={controller.newBodyMetricLabel}
               onChangeDraft={(metricKey, value) =>

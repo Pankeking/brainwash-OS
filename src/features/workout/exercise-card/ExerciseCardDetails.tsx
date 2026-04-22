@@ -2,16 +2,12 @@ import { Check, Minus, Plus, Trash2 } from 'lucide-react'
 import type { PointerEvent } from 'react'
 
 import { SetType } from '~/enums/enums'
+import { formatTimedValue } from '~/features/workout/workout.formatting'
 
 import { ExerciseCardMetaPane } from './ExerciseCardMetaPane'
+import { ExerciseCardTargetEditor } from './ExerciseCardTargetEditor'
 import { ExerciseCardValueStepper } from './ExerciseCardValueStepper'
 import type { ExerciseCardCategory } from './exercise-card.types'
-
-function formatTimedValue(value: number) {
-  const minutes = Math.floor(value / 60)
-  const seconds = value % 60
-  return `${minutes}m:${String(seconds).padStart(2, '0')}s`
-}
 
 interface ExerciseCardDetailsProps {
   allCategories: ExerciseCardCategory[]
@@ -28,26 +24,25 @@ interface ExerciseCardDetailsProps {
   onAdd: (payload: { type: SetType; value: number }) => void
   onSetConfirmingDelete: (value: boolean) => void
   onSetGoalDraft: (value: number | ((current: number) => number)) => void
-  onSetVolumeGoalDraft: (value: number | ((current: number) => number)) => void
+  onSetTargetDraft: (value: string) => void
   onSetType: (value: SetType) => void
   onToggleCategory: (categoryId: string) => void
   onUpdateWeeklyGoal: (
     weeklySetGoal: number | null,
-    weeklyVolumeGoal: number | null,
+    setTargetValue: number | null,
     preferredSetType: SetType,
   ) => void
   orderedCategoryIds: string[]
+  setTargetDraft: string
+  setTargetPreview: string | null
   setType: SetType
   stats: {
     week: { best: number | null; avg: number | null; worst: number | null }
     month: { best: number | null; avg: number | null; worst: number | null }
   }
   tempValue: number
-  volumeGoalDraft: number
   weekSetsDone: number
-  weekVolumeDone: number
   weeklySetGoal: number | null
-  weeklyVolumeGoal: number | null
 }
 
 export function ExerciseCardDetails({
@@ -60,34 +55,23 @@ export function ExerciseCardDetails({
   onAdd,
   onSetConfirmingDelete,
   onSetGoalDraft,
-  onSetVolumeGoalDraft,
+  onSetTargetDraft,
   onSetType,
   onToggleCategory,
   onUpdateWeeklyGoal,
   orderedCategoryIds,
+  setTargetDraft,
+  setTargetPreview,
   setType,
   stats,
   tempValue,
-  volumeGoalDraft,
   weekSetsDone,
-  weekVolumeDone,
   weeklySetGoal,
-  weeklyVolumeGoal,
 }: ExerciseCardDetailsProps) {
   const isTimed = setType === SetType.TIMED
   const smallStep = isTimed ? 5 : 1
   const largeStep = isTimed ? 30 : 5
-  const volumeSmallStep = isTimed ? 15 : 5
-  const volumeLargeStep = isTimed ? 60 : 25
   const tempValueLabel = isTimed ? formatTimedValue(tempValue) : String(tempValue)
-  const weekVolumeDoneLabel = isTimed ? formatTimedValue(weekVolumeDone) : String(weekVolumeDone)
-  const weeklyVolumeGoalLabel =
-    weeklyVolumeGoal !== null
-      ? isTimed
-        ? formatTimedValue(weeklyVolumeGoal)
-        : String(weeklyVolumeGoal)
-      : null
-  const volumeGoalDraftLabel = isTimed ? formatTimedValue(volumeGoalDraft) : String(volumeGoalDraft)
 
   return (
     <div className="overflow-x-auto snap-x snap-mandatory">
@@ -142,7 +126,7 @@ export function ExerciseCardDetails({
                 <button
                   onClick={(event) => {
                     event.stopPropagation()
-                    onUpdateWeeklyGoal(goalDraft, volumeGoalDraft, setType)
+                    onUpdateWeeklyGoal(goalDraft, null, setType)
                   }}
                   className="ml-auto h-7 rounded-lg bg-orange-600 px-2.5 text-[9px] font-black uppercase tracking-widest"
                 >
@@ -152,7 +136,7 @@ export function ExerciseCardDetails({
                   <button
                     onClick={(event) => {
                       event.stopPropagation()
-                      onUpdateWeeklyGoal(null, weeklyVolumeGoal, setType)
+                      onUpdateWeeklyGoal(null, null, setType)
                     }}
                     className="h-7 rounded-lg bg-slate-700 px-2.5 text-[9px] font-black uppercase tracking-widest text-slate-300"
                   >
@@ -160,39 +144,31 @@ export function ExerciseCardDetails({
                   </button>
                 )}
               </div>
-              <div className="mt-3 border-t border-slate-700/40 pt-3">
-                <div className="flex items-center justify-between gap-2">
-                  <div className="text-[9px] font-black uppercase tracking-widest text-slate-400">
-                    {isTimed ? 'Weekly target time' : 'Weekly target reps'}
-                  </div>
-                  <div className="text-[9px] font-black uppercase tracking-widest text-orange-400">
-                    {weekVolumeDoneLabel}
-                    {weeklyVolumeGoalLabel ? ` / ${weeklyVolumeGoalLabel}` : ''}
-                  </div>
-                </div>
-                <div className="mt-2 flex items-center gap-1">
-                  <ExerciseCardValueStepper
-                    decrementLargeLabel={`-${volumeLargeStep}`}
-                    decrementSmallLabel={`-${volumeSmallStep}`}
-                    displayValue={volumeGoalDraftLabel}
-                    incrementLargeLabel={`+${volumeLargeStep}`}
-                    incrementSmallLabel={`+${volumeSmallStep}`}
-                    onDecrementLarge={() =>
-                      onSetVolumeGoalDraft((value) => Math.max(1, value - volumeLargeStep))
-                    }
-                    onDecrementSmall={() =>
-                      onSetVolumeGoalDraft((value) => Math.max(1, value - volumeSmallStep))
-                    }
-                    onIncrementLarge={() =>
-                      onSetVolumeGoalDraft((value) => value + volumeLargeStep)
-                    }
-                    onIncrementSmall={() =>
-                      onSetVolumeGoalDraft((value) => value + volumeSmallStep)
-                    }
-                  />
-                </div>
-              </div>
             </div>
+          </div>
+
+          <div className="mb-4">
+            <span className="mb-2 block text-[9px] font-black uppercase tracking-widest text-slate-500">
+              Set Target
+            </span>
+            <ExerciseCardTargetEditor
+              clearLabel="Clear"
+              inputLabel={isTimed ? 'Target time per set (seconds)' : 'Target reps per set'}
+              inputValue={setTargetDraft}
+              onChange={onSetTargetDraft}
+              onClear={() => onUpdateWeeklyGoal(weeklySetGoal, null, setType)}
+              onSave={() =>
+                onUpdateWeeklyGoal(
+                  weeklySetGoal,
+                  Number.isFinite(Number(setTargetDraft)) && Number(setTargetDraft) > 0
+                    ? Math.round(Number(setTargetDraft))
+                    : null,
+                  setType,
+                )
+              }
+              previewLabel={setTargetPreview}
+              saveLabel="Set"
+            />
           </div>
 
           <div className="mb-2 flex items-center justify-between">
