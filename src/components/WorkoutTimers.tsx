@@ -30,6 +30,7 @@ export default function WorkoutTimers({ autoStartStopwatchToken = 0 }: WorkoutTi
   const [stopwatchRunning, setStopwatchRunning] = useState(false)
   const stopwatchStartedAtRef = useRef(0)
   const stopwatchStartElapsedRef = useRef(0)
+  const lastHandledAutoStartTokenRef = useRef(0)
 
   const countdownDisplay = useMemo(() => formatMs(countdownRemainingMs), [countdownRemainingMs])
   const stopwatchDisplay = useMemo(() => formatMs(stopwatchMs), [stopwatchMs])
@@ -63,9 +64,13 @@ export default function WorkoutTimers({ autoStartStopwatchToken = 0 }: WorkoutTi
   }, [stopwatchRunning])
 
   useEffect(() => {
-    if (autoStartStopwatchToken <= 0) {
+    if (
+      autoStartStopwatchToken <= 0 ||
+      autoStartStopwatchToken === lastHandledAutoStartTokenRef.current
+    ) {
       return
     }
+    lastHandledAutoStartTokenRef.current = autoStartStopwatchToken
     setMode('stopwatch')
     setStopwatchRunning((current) => {
       if (current) {
