@@ -11,6 +11,10 @@ interface ExerciseCardMetaPaneProps {
   }
 }
 
+function renderStatValue(value: number | null) {
+  return value ?? '-'
+}
+
 export function ExerciseCardMetaPane({
   allCategories,
   categoryIds,
@@ -20,16 +24,16 @@ export function ExerciseCardMetaPane({
 }: ExerciseCardMetaPaneProps) {
   return (
     <div className="min-w-full snap-start pl-1">
-      <div className="rounded-xl border border-slate-700 bg-[#1A1F26] p-3">
-        <div className="mb-2 text-[9px] font-black uppercase tracking-widest text-slate-500">
+      <div className="rounded-[1.35rem] border border-white/8 bg-[#161d26]/92 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+        <div className="mb-2 text-[9px] font-black uppercase tracking-[0.22em] text-slate-500">
           Categories
         </div>
         {allCategories.length === 0 ? (
-          <p className="mb-4 text-[9px] italic text-slate-600">
+          <p className="mb-4 rounded-2xl border border-dashed border-white/8 px-3 py-3 text-[10px] italic text-slate-500">
             Create categories above to tag this exercise
           </p>
         ) : (
-          <div className="mb-4 flex flex-wrap gap-1.5">
+          <div className="mb-5 flex flex-wrap gap-2">
             {orderedCategoryIds.map((categoryId) => {
               const category = allCategories.find((item) => item.id === categoryId)
               if (!category) {
@@ -43,7 +47,7 @@ export function ExerciseCardMetaPane({
                     event.stopPropagation()
                     onToggleCategory(category.id)
                   }}
-                  className="rounded-md border px-2 py-1 text-[9px] font-bold transition-all"
+                  className="rounded-2xl border px-3 py-2 text-[10px] font-bold transition-all"
                   style={{
                     backgroundColor: isSelected ? `${category.color}ee` : `${category.color}22`,
                     borderColor: isSelected ? category.color : `${category.color}55`,
@@ -57,30 +61,71 @@ export function ExerciseCardMetaPane({
           </div>
         )}
 
-        <div className="mb-2 text-[9px] font-black uppercase tracking-widest text-slate-500">
+        <div className="mb-2 text-[9px] font-black uppercase tracking-[0.22em] text-slate-500">
           Stats
         </div>
-        <div className="mb-3 grid grid-cols-3 gap-2">
-          <div className="text-[9px] font-black uppercase text-slate-500">Range</div>
-          <div className="text-center text-[9px] font-black uppercase text-slate-500">Best</div>
-          <div className="text-center text-[9px] font-black uppercase text-slate-500">
-            Avg/Worst
+        <div className="grid gap-3 md:grid-cols-2">
+          <div className="rounded-2xl border border-white/6 bg-[#202834]/85 p-3">
+            <div className="text-[9px] font-black uppercase tracking-[0.18em] text-slate-500">
+              Last 7d
+            </div>
+            <div className="mt-3 grid grid-cols-3 gap-2">
+              <div>
+                <div className="text-[8px] font-black uppercase tracking-[0.16em] text-slate-500">
+                  Best
+                </div>
+                <div className="mt-1 text-sm font-black text-green-400">
+                  {renderStatValue(stats.week.best)}
+                </div>
+              </div>
+              <div>
+                <div className="text-[8px] font-black uppercase tracking-[0.16em] text-slate-500">
+                  Avg
+                </div>
+                <div className="mt-1 text-sm font-black text-slate-100">
+                  {renderStatValue(stats.week.avg)}
+                </div>
+              </div>
+              <div>
+                <div className="text-[8px] font-black uppercase tracking-[0.16em] text-slate-500">
+                  Worst
+                </div>
+                <div className="mt-1 text-sm font-black text-slate-300">
+                  {renderStatValue(stats.week.worst)}
+                </div>
+              </div>
+            </div>
           </div>
-        </div>
-        <div className="grid grid-cols-3 gap-2">
-          <div className="text-[10px] font-black text-slate-300">Last 7d</div>
-          <div className="text-center text-[11px] font-black text-green-400">
-            {stats.week.best ?? '-'}
-          </div>
-          <div className="text-center text-[11px] font-black text-slate-300">
-            {stats.week.avg ?? '-'} / {stats.week.worst ?? '-'}
-          </div>
-          <div className="text-[10px] font-black text-slate-300">Last 30d</div>
-          <div className="text-center text-[11px] font-black text-green-400">
-            {stats.month.best ?? '-'}
-          </div>
-          <div className="text-center text-[11px] font-black text-slate-300">
-            {stats.month.avg ?? '-'} / {stats.month.worst ?? '-'}
+          <div className="rounded-2xl border border-white/6 bg-[#202834]/85 p-3">
+            <div className="text-[9px] font-black uppercase tracking-[0.18em] text-slate-500">
+              Last 30d
+            </div>
+            <div className="mt-3 grid grid-cols-3 gap-2">
+              <div>
+                <div className="text-[8px] font-black uppercase tracking-[0.16em] text-slate-500">
+                  Best
+                </div>
+                <div className="mt-1 text-sm font-black text-green-400">
+                  {renderStatValue(stats.month.best)}
+                </div>
+              </div>
+              <div>
+                <div className="text-[8px] font-black uppercase tracking-[0.16em] text-slate-500">
+                  Avg
+                </div>
+                <div className="mt-1 text-sm font-black text-slate-100">
+                  {renderStatValue(stats.month.avg)}
+                </div>
+              </div>
+              <div>
+                <div className="text-[8px] font-black uppercase tracking-[0.16em] text-slate-500">
+                  Worst
+                </div>
+                <div className="mt-1 text-sm font-black text-slate-300">
+                  {renderStatValue(stats.month.worst)}
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>

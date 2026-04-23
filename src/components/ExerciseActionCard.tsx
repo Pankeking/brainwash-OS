@@ -160,10 +160,10 @@ export default function ExerciseActionCard({
   return (
     <div
       onClick={() => !isExpanded && !isEditing && onToggleExpand(id)}
-      className={`overflow-hidden rounded-2xl border-t border-white/5 transition-all duration-300 ${
+      className={`overflow-hidden rounded-[1.6rem] border border-white/8 transition-all duration-300 ${
         isExpanded
-          ? 'p-3 bg-[#2A333E] shadow-[0_8px_0_0_#14181d] ring-1 ring-orange-500/30'
-          : 'p-3 bg-[#2A333E] shadow-[0_4px_0_0_#14181d] hover:bg-[#323d4a]'
+          ? 'bg-[linear-gradient(180deg,rgba(38,49,63,0.98),rgba(24,31,40,0.96))] p-3.5 shadow-[0_18px_44px_rgba(2,8,23,0.28)] ring-1 ring-orange-500/20'
+          : 'bg-[linear-gradient(180deg,rgba(38,49,63,0.92),rgba(27,35,45,0.96))] p-3 shadow-[0_12px_28px_rgba(2,8,23,0.18)] hover:border-white/12 hover:bg-[linear-gradient(180deg,rgba(44,56,72,0.96),rgba(31,40,51,0.98))]'
       }`}
     >
       <ExerciseCardHeader
@@ -190,7 +190,7 @@ export default function ExerciseActionCard({
       <div
         className={`transition-all duration-300 ${
           isExpanded
-            ? 'mt-2 max-h-[680px] border-t border-slate-700/30 pt-2 opacity-100'
+            ? 'mt-3 max-h-[760px] border-t border-white/8 pt-3 opacity-100'
             : 'max-h-0 opacity-0'
         }`}
       >
