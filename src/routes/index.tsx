@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { GithubIcon } from 'lucide-react'
+import { ArrowRight, GithubIcon, Sparkles, Timer, Dumbbell } from 'lucide-react'
 import { useAuth } from '~/contexts/auth'
 import { logoutFn, initiateOAuthFn } from '~/server/auth'
 import { Hero, Chat, Button } from '~/components/components'
@@ -72,44 +72,100 @@ function Home() {
   }
 
   return (
-    <div className="min-h-screen bg-[#1A1F26] text-slate-100 flex flex-col items-center justify-center p-6 bg-[radial-gradient(circle_at_top,_var(--tw-gradient-stops))] from-[#2A333E] via-[#1A1F26] to-[#0F1216]">
-      <Hero title="Brainwash">
-        Gaslight your mind into a <br /> super human{' '}
-        <span className="text-orange-500">reality.</span>
-      </Hero>
+    <div className="min-h-screen bg-[#1A1F26] bg-[radial-gradient(circle_at_top,_var(--tw-gradient-stops))] from-[#2A333E] via-[#1A1F26] to-[#0F1216] px-5 py-8 text-slate-100 sm:px-6 lg:px-8">
+      <div className="mx-auto flex min-h-[calc(100vh-4rem)] max-w-6xl items-center">
+        <div className="grid w-full gap-8 lg:grid-cols-[minmax(0,1.15fr)_24rem] lg:gap-12">
+          <div className="flex flex-col justify-center">
+            <div className="mb-5 inline-flex w-fit items-center gap-2 rounded-full border border-white/8 bg-white/6 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.2em] text-slate-300 backdrop-blur-xl">
+              <Sparkles size={12} className="text-orange-400" />
+              Workout focus system
+            </div>
+            <Hero title="Brainwash">
+              Build a cleaner training flow with fast set logging, timer-first workouts, and body
+              tracking that stays out of your way.
+            </Hero>
 
-      <div className="flex flex-wrap gap-4 justify-center mb-16">
-        {user ? (
-          <>
-            <Link to="/workout">
-              <Button variant="primary" className="min-w-[110px]">
-                Exercise
-              </Button>
-            </Link>
-            <Button
-              onClick={handleLogout}
-              variant="secondary"
-              className="min-w-[110px]"
-              disabled={logoutMutation.isPending}
-            >
-              {logoutMutation.isPending ? 'Logging out...' : 'Logout'}
-            </Button>
-          </>
-        ) : (
-          <Button
-            variant="primary"
-            onClick={handleGitHubLogin}
-            className="min-w-[110px]"
-            disabled={initiateOAuthMutation.isPending}
-          >
-            <GithubIcon size={20} className="text-orange-400" />
-            {initiateOAuthMutation.isPending ? 'Logging in...' : 'Login with GitHub'}
-          </Button>
-        )}
+            <div className="grid gap-3 sm:grid-cols-3">
+              <div className="rounded-[1.4rem] border border-white/8 bg-white/5 p-4 backdrop-blur-xl">
+                <Timer size={16} className="text-orange-400" />
+                <div className="mt-3 text-sm font-black text-slate-100">Timer-first flow</div>
+                <p className="mt-1 text-sm text-slate-400">
+                  Log a set and keep the clock moving without resetting context.
+                </p>
+              </div>
+              <div className="rounded-[1.4rem] border border-white/8 bg-white/5 p-4 backdrop-blur-xl">
+                <Dumbbell size={16} className="text-orange-400" />
+                <div className="mt-3 text-sm font-black text-slate-100">Exercise bank</div>
+                <p className="mt-1 text-sm text-slate-400">
+                  Keep categories, targets, and weekly rhythm attached to each lift.
+                </p>
+              </div>
+              <div className="rounded-[1.4rem] border border-white/8 bg-white/5 p-4 backdrop-blur-xl">
+                <Sparkles size={16} className="text-orange-400" />
+                <div className="mt-3 text-sm font-black text-slate-100">Body tracking</div>
+                <p className="mt-1 text-sm text-slate-400">
+                  Track weight and measurements without abusing exercises as fake metrics.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center">
+            <div className="w-full rounded-[1.8rem] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.08),rgba(255,255,255,0.04))] p-5 shadow-[0_28px_80px_rgba(2,8,23,0.34)] backdrop-blur-2xl">
+              <div className="mb-5">
+                <div className="text-[10px] font-black uppercase tracking-[0.22em] text-slate-500">
+                  {user ? 'Ready to train' : 'Sign in'}
+                </div>
+                <div className="mt-2 text-2xl font-black tracking-tight text-slate-50">
+                  {user ? 'Open your workout space.' : 'Use GitHub to enter your workspace.'}
+                </div>
+                <p className="mt-2 text-sm text-slate-400">
+                  {user
+                    ? 'Jump straight back into exercises, timers, and tracking.'
+                    : 'Authentication is required before workout, chat, and body data become available.'}
+                </p>
+              </div>
+
+              <div className="space-y-3">
+                {user ? (
+                  <>
+                    <Link to="/workout" className="block">
+                      <Button variant="accent" className="h-12 w-full justify-between px-4">
+                        Open exercises
+                        <ArrowRight size={16} />
+                      </Button>
+                    </Link>
+                    <Button
+                      onClick={handleLogout}
+                      variant="secondary"
+                      className="h-12 w-full"
+                      disabled={logoutMutation.isPending}
+                    >
+                      {logoutMutation.isPending ? 'Logging out...' : 'Logout'}
+                    </Button>
+                  </>
+                ) : (
+                  <Button
+                    variant="accent"
+                    onClick={handleGitHubLogin}
+                    className="h-12 w-full justify-between px-4"
+                    disabled={initiateOAuthMutation.isPending}
+                  >
+                    <span className="flex items-center gap-2">
+                      <GithubIcon size={18} className="text-white" />
+                      {initiateOAuthMutation.isPending ? 'Logging in...' : 'Continue with GitHub'}
+                    </span>
+                    <ArrowRight size={16} />
+                  </Button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
       {user ? (
-        <div className="fixed bottom-10">
+        <div className="fixed bottom-8 right-8">
           <Chat />
         </div>
       ) : null}

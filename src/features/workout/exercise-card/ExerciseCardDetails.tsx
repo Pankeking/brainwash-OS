@@ -5,6 +5,7 @@ import { SetType } from '~/enums/enums'
 import { formatTimedValue } from '~/features/workout/workout.formatting'
 
 import { ExerciseCardMetaPane } from './ExerciseCardMetaPane'
+import { ExerciseCardPager } from './ExerciseCardPager'
 import { ExerciseCardTargetEditor } from './ExerciseCardTargetEditor'
 import { ExerciseCardValueStepper } from './ExerciseCardValueStepper'
 import type { ExerciseCardCategory } from './exercise-card.types'
@@ -72,104 +73,26 @@ export function ExerciseCardDetails({
   const smallStep = isTimed ? 5 : 1
   const largeStep = isTimed ? 30 : 5
   const tempValueLabel = isTimed ? formatTimedValue(tempValue) : String(tempValue)
-
-  return (
-    <div className="grid gap-3 xl:grid-cols-[minmax(0,1.45fr)_minmax(18rem,0.95fr)]">
-      <div className="space-y-3">
-        <section className="rounded-[1.25rem] border border-white/8 bg-[#161d26]/92 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
-          <div className="mb-3 flex items-center justify-between gap-3">
-            <div>
-              <div className="text-[9px] font-black uppercase tracking-[0.22em] text-slate-500">
-                Weekly rhythm
-              </div>
-              <div className="mt-1 text-sm font-black text-slate-100">
-                {weekSetsDone} set{weekSetsDone === 1 ? '' : 's'} logged
-              </div>
-            </div>
-            <div className="rounded-full border border-orange-400/15 bg-orange-500/10 px-3 py-1 text-[9px] font-black uppercase tracking-[0.18em] text-orange-300">
-              {hasWeeklyGoal ? `${weekSetsDone} / ${weeklySetGoal}` : 'No goal'}
-            </div>
-          </div>
-          {hasWeeklyGoal ? (
-            <div className="h-2 overflow-hidden rounded-full bg-slate-800">
-              <div
-                className="h-full bg-orange-500 transition-all"
-                style={{ width: `${goalProgressPct}%` }}
-              />
-            </div>
-          ) : (
-            <div className="rounded-2xl border border-dashed border-white/8 px-3 py-2 text-[10px] font-bold text-slate-500">
-              No weekly goal set yet
-            </div>
-          )}
-          <div className="mt-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-stretch">
-            <div className="rounded-2xl border border-white/6 bg-[#202834]/85 p-3">
-              <div className="mb-3 flex items-center justify-between gap-3">
-                <div>
-                  <div className="text-[9px] font-black uppercase tracking-[0.22em] text-slate-500">
-                    Sets this week
-                  </div>
-                  <div className="mt-1 font-mono text-xl font-black text-white">{goalDraft}</div>
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={(event) => {
-                      event.stopPropagation()
-                      onSetGoalDraft((value) => Math.max(1, value - 1))
-                    }}
-                    className="flex h-9 w-9 items-center justify-center rounded-2xl border border-white/8 bg-white/6 text-slate-200 transition-colors hover:bg-white/10"
-                  >
-                    <Minus size={14} />
-                  </button>
-                  <button
-                    onClick={(event) => {
-                      event.stopPropagation()
-                      onSetGoalDraft((value) => value + 1)
-                    }}
-                    className="flex h-9 w-9 items-center justify-center rounded-2xl border border-white/8 bg-white/6 text-slate-200 transition-colors hover:bg-white/10"
-                  >
-                    <Plus size={14} />
-                  </button>
-                </div>
-              </div>
-            </div>
-            <div className="grid gap-2 sm:w-36">
-              <button
-                onClick={(event) => {
-                  event.stopPropagation()
-                  onUpdateWeeklyGoal(goalDraft, null, setType)
-                }}
-                className="flex h-10 items-center justify-center rounded-2xl bg-orange-500 px-3 text-[9px] font-black uppercase tracking-[0.2em] text-white shadow-[0_10px_24px_rgba(249,115,22,0.22)]"
-              >
-                Save goal
-              </button>
-              {weeklySetGoal !== null && (
-                <button
-                  onClick={(event) => {
-                    event.stopPropagation()
-                    onUpdateWeeklyGoal(null, null, setType)
-                  }}
-                  className="flex h-10 items-center justify-center rounded-2xl border border-white/8 bg-[#202834]/85 px-3 text-[9px] font-black uppercase tracking-[0.2em] text-slate-300"
-                >
-                  Clear goal
-                </button>
-              )}
-            </div>
-          </div>
-        </section>
-
+  const pages = [
+    {
+      id: 'log',
+      label: 'Set logging',
+      content: (
         <section className="rounded-[1.25rem] border border-white/8 bg-[#161d26]/92 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
           <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <div className="text-[9px] font-black uppercase tracking-[0.22em] text-slate-500">
-                Set plan
+                Log next set
               </div>
               <div className="mt-1 text-sm font-black text-slate-100">
-                Choose how this exercise should be logged
+                {isTimed ? 'Adjust time and save the set' : 'Adjust reps and save the set'}
               </div>
             </div>
+            <div className="rounded-full border border-white/8 bg-[#202834]/85 px-3 py-1 text-[10px] font-black text-slate-100">
+              {tempValueLabel}
+            </div>
           </div>
-          <div className="flex overflow-hidden rounded-2xl border border-white/8 bg-[#202834]/85 p-1">
+          <div className="mb-3 flex overflow-hidden rounded-2xl border border-white/8 bg-[#202834]/85 p-1">
             <button
               onClick={(event) => {
                 event.stopPropagation()
@@ -196,41 +119,6 @@ export function ExerciseCardDetails({
             >
               Time
             </button>
-          </div>
-        </section>
-
-        <ExerciseCardTargetEditor
-          clearLabel="Clear"
-          inputLabel={isTimed ? 'Target time per set (seconds)' : 'Target reps per set'}
-          inputValue={setTargetDraft}
-          onChange={onSetTargetDraft}
-          onClear={() => onUpdateWeeklyGoal(weeklySetGoal, null, setType)}
-          onSave={() =>
-            onUpdateWeeklyGoal(
-              weeklySetGoal,
-              Number.isFinite(Number(setTargetDraft)) && Number(setTargetDraft) > 0
-                ? Math.round(Number(setTargetDraft))
-                : null,
-              setType,
-            )
-          }
-          previewLabel={setTargetPreview}
-          saveLabel="Set"
-        />
-
-        <section className="rounded-[1.25rem] border border-white/8 bg-[#161d26]/92 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
-          <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <div className="text-[9px] font-black uppercase tracking-[0.22em] text-slate-500">
-                Log next set
-              </div>
-              <div className="mt-1 text-sm font-black text-slate-100">
-                {isTimed ? 'Adjust time and save the set' : 'Adjust reps and save the set'}
-              </div>
-            </div>
-            <div className="rounded-full border border-white/8 bg-[#202834]/85 px-3 py-1 text-[10px] font-black text-slate-100">
-              {tempValueLabel}
-            </div>
           </div>
           <ExerciseCardValueStepper
             centerWidthClassName="w-20 sm:w-24"
@@ -275,15 +163,130 @@ export function ExerciseCardDetails({
             </button>
           </div>
         </section>
-      </div>
+      ),
+    },
+    {
+      id: 'targets',
+      label: 'Goals and targets',
+      content: (
+        <div className="space-y-3">
+          <section className="rounded-[1.25rem] border border-white/8 bg-[#161d26]/92 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <div>
+                <div className="text-[9px] font-black uppercase tracking-[0.22em] text-slate-500">
+                  Weekly rhythm
+                </div>
+                <div className="mt-1 text-sm font-black text-slate-100">
+                  {weekSetsDone} set{weekSetsDone === 1 ? '' : 's'} logged
+                </div>
+              </div>
+              <div className="rounded-full border border-orange-400/15 bg-orange-500/10 px-3 py-1 text-[9px] font-black uppercase tracking-[0.18em] text-orange-300">
+                {hasWeeklyGoal ? `${weekSetsDone} / ${weeklySetGoal}` : 'No goal'}
+              </div>
+            </div>
+            {hasWeeklyGoal ? (
+              <div className="h-2 overflow-hidden rounded-full bg-slate-800">
+                <div
+                  className="h-full bg-orange-500 transition-all"
+                  style={{ width: `${goalProgressPct}%` }}
+                />
+              </div>
+            ) : (
+              <div className="rounded-2xl border border-dashed border-white/8 px-3 py-2 text-[10px] font-bold text-slate-500">
+                No weekly goal set yet
+              </div>
+            )}
+            <div className="mt-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-stretch">
+              <div className="rounded-2xl border border-white/6 bg-[#202834]/85 p-3">
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <div>
+                    <div className="text-[9px] font-black uppercase tracking-[0.22em] text-slate-500">
+                      Sets this week
+                    </div>
+                    <div className="mt-1 font-mono text-xl font-black text-white">{goalDraft}</div>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={(event) => {
+                        event.stopPropagation()
+                        onSetGoalDraft((value) => Math.max(1, value - 1))
+                      }}
+                      className="flex h-9 w-9 items-center justify-center rounded-2xl border border-white/8 bg-white/6 text-slate-200 transition-colors hover:bg-white/10"
+                    >
+                      <Minus size={14} />
+                    </button>
+                    <button
+                      onClick={(event) => {
+                        event.stopPropagation()
+                        onSetGoalDraft((value) => value + 1)
+                      }}
+                      className="flex h-9 w-9 items-center justify-center rounded-2xl border border-white/8 bg-white/6 text-slate-200 transition-colors hover:bg-white/10"
+                    >
+                      <Plus size={14} />
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <div className="grid gap-2 sm:w-36">
+                <button
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    onUpdateWeeklyGoal(goalDraft, null, setType)
+                  }}
+                  className="flex h-10 items-center justify-center rounded-2xl bg-orange-500 px-3 text-[9px] font-black uppercase tracking-[0.2em] text-white shadow-[0_10px_24px_rgba(249,115,22,0.22)]"
+                >
+                  Save goal
+                </button>
+                {weeklySetGoal !== null && (
+                  <button
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      onUpdateWeeklyGoal(null, null, setType)
+                    }}
+                    className="flex h-10 items-center justify-center rounded-2xl border border-white/8 bg-[#202834]/85 px-3 text-[9px] font-black uppercase tracking-[0.2em] text-slate-300"
+                  >
+                    Clear goal
+                  </button>
+                )}
+              </div>
+            </div>
+          </section>
 
-      <ExerciseCardMetaPane
-        allCategories={allCategories}
-        categoryIds={categoryIds}
-        onToggleCategory={onToggleCategory}
-        orderedCategoryIds={orderedCategoryIds}
-        stats={stats}
-      />
-    </div>
-  )
+          <ExerciseCardTargetEditor
+            clearLabel="Clear"
+            inputLabel={isTimed ? 'Target time per set (seconds)' : 'Target reps per set'}
+            inputValue={setTargetDraft}
+            onChange={onSetTargetDraft}
+            onClear={() => onUpdateWeeklyGoal(weeklySetGoal, null, setType)}
+            onSave={() =>
+              onUpdateWeeklyGoal(
+                weeklySetGoal,
+                Number.isFinite(Number(setTargetDraft)) && Number(setTargetDraft) > 0
+                  ? Math.round(Number(setTargetDraft))
+                  : null,
+                setType,
+              )
+            }
+            previewLabel={setTargetPreview}
+            saveLabel="Set"
+          />
+        </div>
+      ),
+    },
+    {
+      id: 'meta',
+      label: 'Categories and stats',
+      content: (
+        <ExerciseCardMetaPane
+          allCategories={allCategories}
+          categoryIds={categoryIds}
+          onToggleCategory={onToggleCategory}
+          orderedCategoryIds={orderedCategoryIds}
+          stats={stats}
+        />
+      ),
+    },
+  ]
+
+  return <ExerciseCardPager pages={pages} />
 }
