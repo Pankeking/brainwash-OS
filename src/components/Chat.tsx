@@ -104,7 +104,7 @@ export default function Chat({ context, onWorkoutDataChanged }: ChatProps) {
       code: string
       level?: 'info' | 'warn' | 'error'
       message: string
-      context?: Record<string, unknown>
+      context?: Record<string, string | number | boolean | null>
     }) => logClientTelemetryFn({ data: payload }),
   })
 
@@ -112,14 +112,17 @@ export default function Chat({ context, onWorkoutDataChanged }: ChatProps) {
     code: string,
     level: 'info' | 'warn' | 'error',
     message: string,
-    telemetryContext?: Record<string, unknown>,
+    telemetryContext?: Record<string, string | number | boolean | null>,
   ) => {
+    const activeTab =
+      telemetryContext?.activeTab ?? telemetryContext?.tab ?? telemetryContext?.active ?? null
+
     telemetryMutation.mutate({
       code,
       level,
       message,
       context: {
-        activeTab: telemetryContext?.activeTab || telemetryContext?.tab || telemetryContext?.active,
+        activeTab,
         ...telemetryContext,
       },
     })

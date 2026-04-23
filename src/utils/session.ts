@@ -6,7 +6,6 @@ type SessionData = {
   email?: string
   role?: string
   oauthState?: string
-  oauthRedirectUri?: string
 }
 
 export function useAppSession() {

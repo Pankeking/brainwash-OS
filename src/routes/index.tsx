@@ -7,7 +7,6 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 
 interface InitiateOAuthInput {
   provider: 'github'
-  origin?: string
 }
 
 export const Route = createFileRoute('/')({
@@ -38,7 +37,7 @@ function Home() {
   }
 
   const handleGitHubLogin = () => {
-    initiateOAuthMutation.mutate({ provider: 'github', origin: window.location.origin })
+    initiateOAuthMutation.mutate({ provider: 'github' })
   }
 
   if (isLoading) {
