@@ -8,7 +8,7 @@ export const Route = createFileRoute('/auth/github/callback')({
   }),
   loaderDeps: ({ search: { code, state } }) => ({ code, state }),
   loader: async ({ deps }) => {
-    await githubAuthCallbackFn({ data: deps })
-    throw redirect({ to: '/' })
+    const result = await githubAuthCallbackFn({ data: deps })
+    throw redirect({ to: result.redirectTo || '/workout' })
   },
 })

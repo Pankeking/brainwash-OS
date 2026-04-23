@@ -1,5 +1,4 @@
 import { createServerFn } from '@tanstack/react-start'
-import { redirect } from '@tanstack/react-router'
 import { z } from 'zod'
 import { useAppSession } from '~/utils/session'
 import connectDB from './db'
@@ -20,11 +19,7 @@ type GitHubProfile = {
   expiresIn?: number
 }
 
-type GitHubEmailResponse = {
-  email: string
-  primary: boolean
-  verified: boolean
-}
+const DEFAULT_POST_LOGIN_REDIRECT = '/workout'
 
 function generateRandomState(length: number = 32): string {
   return Array.from(crypto.getRandomValues(new Uint8Array(length)), (byte) =>
@@ -42,9 +37,24 @@ function generateGitHubOAuthUrl(clientId: string, redirectUri: string, state: st
   return `https://github.com/login/oauth/authorize?${params.toString()}`
 }
 
+function sanitizePostLoginRedirect(value?: string) {
+  if (!value) {
+    return DEFAULT_POST_LOGIN_REDIRECT
+  }
+  if (!value.startsWith('/') || value.startsWith('//')) {
+    return DEFAULT_POST_LOGIN_REDIRECT
+  }
+  return value.slice(0, 500)
+}
+
 export const initiateOAuthFn = createServerFn({ method: 'GET' })
-  .inputValidator(z.object({ provider: z.literal('github') }))
-  .handler(async () => {
+  .inputValidator(
+    z.object({
+      provider: z.literal('github'),
+      redirectTo: z.string().min(1).max(500).optional(),
+    }),
+  )
+  .handler(async ({ data }) => {
     const GITHUB_CLIENT_ID = getEnvValue('GITHUB_CLIENT_ID')
     const APP_URL = getEnvValue('APP_URL')
     const REDIRECT_URI = `${APP_URL}/auth/github/callback`
@@ -52,7 +62,10 @@ export const initiateOAuthFn = createServerFn({ method: 'GET' })
     const state = generateRandomState()
 
     const session = await useAppSession()
-    await session.update({ oauthState: state })
+    await session.update({
+      oauthState: state,
+      postLoginRedirect: sanitizePostLoginRedirect(data.redirectTo),
+    })
 
     const authUrl = generateGitHubOAuthUrl(GITHUB_CLIENT_ID, REDIRECT_URI, state)
 
@@ -88,26 +101,12 @@ async function authenticateGitHubUser(githubProfile: GitHubProfile) {
   return user
 }
 
-async function getUserById(userId: string) {
-  await connectDB()
-  const user = await UserModel.findById(userId).lean()
-  if (!user) {
-    return null
-  }
-
-  return {
-    id: String(user._id),
-    email: user.email || '',
-    username: user.username,
-    avatarUrl: user.avatarUrl || undefined,
-  }
-}
-
 export const githubAuthCallbackFn = createServerFn({ method: 'GET' })
   .inputValidator((data: { code: string; state: string }) => data)
   .handler(async ({ data }) => {
     const session = await useAppSession()
     const oauthRedirectUri = `${getEnvValue('APP_URL')}/auth/github/callback`
+    const postLoginRedirect = sanitizePostLoginRedirect(session.data.postLoginRedirect)
 
     if (data.state !== session.data.oauthState) {
       throw new Error('Invalid state')
@@ -132,23 +131,13 @@ export const githubAuthCallbackFn = createServerFn({ method: 'GET' })
       headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
     }).then((res) => res.json())
 
-    let email = githubUser.email as string | null
-    if (!email) {
-      const emailsResponse = await fetch('https://api.github.com/user/emails', {
-        headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
-      }).then((res) => res.json())
-
-      if (Array.isArray(emailsResponse)) {
-        const typedEmails = emailsResponse as GitHubEmailResponse[]
-        const primaryEmail = typedEmails.find((entry) => entry.primary && entry.verified)
-        email = primaryEmail?.email || typedEmails[0]?.email || null
-      }
-    }
+    const email = githubUser.email as string | null
 
     await session.update({
       userId: undefined,
       email: undefined,
       oauthState: undefined,
+      postLoginRedirect: undefined,
     })
 
     const user = await authenticateGitHubUser({
@@ -166,9 +155,10 @@ export const githubAuthCallbackFn = createServerFn({ method: 'GET' })
       userId: String(user._id),
       email: user.email || '',
       oauthState: undefined,
+      postLoginRedirect: undefined,
     })
 
-    throw redirect({ to: '/' })
+    return { redirectTo: postLoginRedirect }
   })
 
 export const logoutFn = createServerFn({ method: 'POST' }).handler(async () => {
@@ -186,5 +176,8 @@ export const getCurrentUserFn = createServerFn({ method: 'GET' }).handler(async 
     return null
   }
 
-  return await getUserById(userId)
+  return {
+    id: userId,
+    email: session.data.email || '',
+  }
 })

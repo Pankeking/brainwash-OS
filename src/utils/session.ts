@@ -6,6 +6,7 @@ type SessionData = {
   email?: string
   role?: string
   oauthState?: string
+  postLoginRedirect?: string
 }
 
 export function useAppSession() {

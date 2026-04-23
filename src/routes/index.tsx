@@ -7,13 +7,33 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 
 interface InitiateOAuthInput {
   provider: 'github'
+  redirectTo?: string
 }
 
 export const Route = createFileRoute('/')({
   component: Home,
 })
 
+function getLoginRedirectTarget(rawRedirect?: string) {
+  if (!rawRedirect) {
+    return '/workout'
+  }
+  if (rawRedirect.startsWith('/') && !rawRedirect.startsWith('//')) {
+    return rawRedirect
+  }
+  try {
+    const parsed = new URL(rawRedirect, window.location.origin)
+    if (parsed.origin !== window.location.origin) {
+      return '/workout'
+    }
+    return `${parsed.pathname}${parsed.search}${parsed.hash}` || '/workout'
+  } catch {
+    return '/workout'
+  }
+}
+
 function Home() {
+  const search = Route.useSearch({ strict: false })
   const { user, isLoading, refetch } = useAuth()
 
   const queryClient = useQueryClient()
@@ -37,7 +57,10 @@ function Home() {
   }
 
   const handleGitHubLogin = () => {
-    initiateOAuthMutation.mutate({ provider: 'github' })
+    initiateOAuthMutation.mutate({
+      provider: 'github',
+      redirectTo: getLoginRedirectTarget(search.redirect),
+    })
   }
 
   if (isLoading) {
