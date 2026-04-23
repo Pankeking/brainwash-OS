@@ -33,7 +33,6 @@ function getLoginRedirectTarget(rawRedirect?: string) {
 }
 
 function Home() {
-  const search = Route.useSearch({ strict: false })
   const { user, isLoading, refetch } = useAuth()
 
   const queryClient = useQueryClient()
@@ -57,9 +56,10 @@ function Home() {
   }
 
   const handleGitHubLogin = () => {
+    const searchParams = new URLSearchParams(window.location.search)
     initiateOAuthMutation.mutate({
       provider: 'github',
-      redirectTo: getLoginRedirectTarget(search.redirect),
+      redirectTo: getLoginRedirectTarget(searchParams.get('redirect') || undefined),
     })
   }
 

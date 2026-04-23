@@ -41,139 +41,149 @@ function WorkoutView() {
   const controller = useWorkoutPageController(Route.useLoaderData())
 
   return (
-    <div className="min-h-screen bg-[#1A1F26] p-5 pb-32 font-sans text-slate-100">
-      <header className="mb-6 flex items-center justify-between pt-2">
-        <Link to="/" className="p-2 -ml-2 text-slate-400 transition-colors hover:text-white">
-          <ChevronLeft size={24} />
-        </Link>
-        <div className="rounded-md border border-slate-700 bg-[#2A333E] px-3 py-1 text-[10px] font-black uppercase tracking-widest text-slate-400">
-          {formatWorkoutDayLabel(controller.selectedDay)}
-        </div>
-      </header>
-
-      <WeeklyCalendar
-        selectedDay={controller.selectedDay}
-        onSelectDay={controller.setSelectedDay}
-      />
-      <WorkoutTabBar activeTab={controller.activeTab} onChange={controller.setActiveTab} />
-      {controller.notice && (
-        <WorkoutNoticeBanner message={controller.notice.message} tone={controller.notice.tone} />
-      )}
-
-      {controller.isLoading ? (
-        <div className="py-10 text-center text-sm text-slate-400">Loading workout data...</div>
-      ) : (
-        <section className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-          <div className={controller.activeTab === 'time' ? 'block' : 'hidden'}>
-            <WorkoutTimers autoStartStopwatchToken={controller.timerAutoStartToken} />
+    <div className="min-h-screen bg-[#0b1118] px-4 pb-32 pt-5 font-sans text-slate-100 sm:px-5">
+      <div className="mx-auto max-w-5xl">
+        <div className="absolute inset-x-0 top-0 -z-10 h-[26rem] bg-[radial-gradient(circle_at_top,rgba(251,146,60,0.15),transparent_36%),radial-gradient(circle_at_20%_20%,rgba(56,189,248,0.12),transparent_28%),linear-gradient(180deg,#101720_0%,#0b1118_60%)]" />
+        <header className="mb-6 flex items-center justify-between pt-2">
+          <Link
+            to="/"
+            className="rounded-2xl border border-white/8 bg-white/5 p-2 text-slate-400 backdrop-blur-xl transition-colors hover:text-white"
+          >
+            <ChevronLeft size={24} />
+          </Link>
+          <div className="rounded-full border border-white/8 bg-white/5 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.24em] text-slate-300 backdrop-blur-xl">
+            {formatWorkoutDayLabel(controller.selectedDay)}
           </div>
+        </header>
 
-          {controller.activeTab === 'categories' && (
-            <WorkoutCategoriesTab
-              categories={controller.categories}
-              isAddingCategory={controller.isAddingCategory}
-              isWeeklyStatsLoading={controller.isWeeklyStatsLoading}
-              newCategoryName={controller.newCategoryName}
-              onAddCategory={controller.handleAddCategory}
-              onCycleCategoryColor={controller.cycleCategoryColor}
-              onRemoveCategory={(categoryId) =>
-                controller.removeCategoryMutation.mutate({
-                  data: { categoryId },
-                })
-              }
-              onSetIsAddingCategory={controller.setIsAddingCategory}
-              onSetNewCategoryName={controller.setNewCategoryName}
-              onShowMoreWeeks={() => controller.setWeeksToShow((current) => current + 4)}
-              weeklyStatsData={controller.weeklyStatsData}
-            />
-          )}
+        <div className="mb-5 overflow-hidden rounded-[1.75rem] border border-white/8 bg-white/4 p-3 shadow-[0_20px_60px_rgba(2,8,23,0.28)] backdrop-blur-xl">
+          <WeeklyCalendar
+            selectedDay={controller.selectedDay}
+            onSelectDay={controller.setSelectedDay}
+          />
+        </div>
+        <WorkoutTabBar activeTab={controller.activeTab} onChange={controller.setActiveTab} />
+        {controller.notice && (
+          <WorkoutNoticeBanner message={controller.notice.message} tone={controller.notice.tone} />
+        )}
 
-          {controller.activeTab === 'exercises' && (
-            <WorkoutExercisesTab
-              categories={controller.categories}
-              expandedExerciseId={controller.expandedExerciseId}
-              isAddingExercise={controller.isAddingExercise}
-              logCountByExercise={controller.logCountByExercise}
-              newExerciseName={controller.newExerciseName}
-              onAddExercise={controller.handleAddExercise}
-              onAddSet={controller.handleAddSet}
-              onRemoveExercise={(exerciseId) =>
-                controller.removeExerciseMutation.mutate({
-                  data: { selectedDay: controller.selectedDay, exerciseId },
-                })
-              }
-              onRenameExercise={(exerciseId, nextName) =>
-                controller.renameExerciseMutation.mutate({
-                  data: { exerciseId, nextName },
-                })
-              }
-              onSetExpandedExerciseId={controller.setExpandedExerciseId}
-              onSetIsAddingExercise={controller.setIsAddingExercise}
-              onSetNewExerciseName={controller.setNewExerciseName}
-              onToggleExerciseCategory={(exerciseId, categoryId) =>
-                controller.toggleExerciseCategoryMutation.mutate({
-                  data: { exerciseId, categoryId },
-                })
-              }
-              onUpdateExerciseWeeklyGoal={controller.handleUpdateExerciseWeeklyGoal}
-              sortedExercises={controller.sortedExercises}
-            />
-          )}
+        {controller.isLoading ? (
+          <div className="rounded-[1.75rem] border border-white/8 bg-white/4 py-10 text-center text-sm text-slate-400 backdrop-blur-xl">
+            Loading workout data...
+          </div>
+        ) : (
+          <section className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <div className={controller.activeTab === 'time' ? 'block' : 'hidden'}>
+              <WorkoutTimers autoStartStopwatchToken={controller.timerAutoStartToken} />
+            </div>
 
-          {controller.activeTab === 'body' && (
-            <WorkoutBodyTab
-              definitions={controller.bodyMetricsData?.definitions || []}
-              draftValues={controller.metricDrafts}
-              entries={controller.bodyMetricsData?.entries || []}
-              latest={controller.bodyMetricsData?.latest || []}
-              stats={controller.bodyMetricsData?.stats || []}
-              newMetricKind={controller.newBodyMetricKind}
-              newMetricLabel={controller.newBodyMetricLabel}
-              onChangeDraft={(metricKey, value) =>
-                controller.setMetricDrafts((current) => ({
-                  ...current,
-                  [metricKey]: value,
-                }))
-              }
-              onCreateDefinition={controller.handleCreateBodyMetricDefinition}
-              onRemoveDefinition={(metricKey) =>
-                controller.removeMetricDefinitionMutation.mutate({
-                  data: { metricKey },
-                })
-              }
-              onRemoveEntry={(entryId) =>
-                controller.removeMetricMutation.mutate({
-                  data: { selectedDay: controller.selectedDay, entryId },
-                })
-              }
-              onSaveMetric={controller.handleSaveMetric}
-              onSetNewMetricKind={controller.setNewBodyMetricKind}
-              onSetNewMetricLabel={controller.setNewBodyMetricLabel}
-            />
-          )}
+            {controller.activeTab === 'categories' && (
+              <WorkoutCategoriesTab
+                categories={controller.categories}
+                isAddingCategory={controller.isAddingCategory}
+                isWeeklyStatsLoading={controller.isWeeklyStatsLoading}
+                newCategoryName={controller.newCategoryName}
+                onAddCategory={controller.handleAddCategory}
+                onCycleCategoryColor={controller.cycleCategoryColor}
+                onRemoveCategory={(categoryId) =>
+                  controller.removeCategoryMutation.mutate({
+                    data: { categoryId },
+                  })
+                }
+                onSetIsAddingCategory={controller.setIsAddingCategory}
+                onSetNewCategoryName={controller.setNewCategoryName}
+                onShowMoreWeeks={() => controller.setWeeksToShow((current) => current + 4)}
+                weeklyStatsData={controller.weeklyStatsData}
+              />
+            )}
 
-          {controller.activeTab === 'history' && (
-            <WorkoutHistoryTab
-              confirmDeleteSetId={controller.confirmDeleteSetId}
-              logs={controller.filteredLogs}
-              onConfirmDeleteSetId={controller.setConfirmDeleteSetId}
-              onRemoveSet={(logId) =>
-                controller.removeSetMutation.mutate({
-                  data: { selectedDay: controller.selectedDay, logId },
-                })
-              }
-            />
-          )}
-        </section>
-      )}
+            {controller.activeTab === 'exercises' && (
+              <WorkoutExercisesTab
+                categories={controller.categories}
+                expandedExerciseId={controller.expandedExerciseId}
+                isAddingExercise={controller.isAddingExercise}
+                logCountByExercise={controller.logCountByExercise}
+                newExerciseName={controller.newExerciseName}
+                onAddExercise={controller.handleAddExercise}
+                onAddSet={controller.handleAddSet}
+                onRemoveExercise={(exerciseId) =>
+                  controller.removeExerciseMutation.mutate({
+                    data: { selectedDay: controller.selectedDay, exerciseId },
+                  })
+                }
+                onRenameExercise={(exerciseId, nextName) =>
+                  controller.renameExerciseMutation.mutate({
+                    data: { exerciseId, nextName },
+                  })
+                }
+                onSetExpandedExerciseId={controller.setExpandedExerciseId}
+                onSetIsAddingExercise={controller.setIsAddingExercise}
+                onSetNewExerciseName={controller.setNewExerciseName}
+                onToggleExerciseCategory={(exerciseId, categoryId) =>
+                  controller.toggleExerciseCategoryMutation.mutate({
+                    data: { exerciseId, categoryId },
+                  })
+                }
+                onUpdateExerciseWeeklyGoal={controller.handleUpdateExerciseWeeklyGoal}
+                sortedExercises={controller.sortedExercises}
+              />
+            )}
 
-      <Chat
-        context={{
-          selectedDay: controller.selectedDay,
-          activeTab: controller.activeTab,
-        }}
-        onWorkoutDataChanged={controller.onAssistantWorkoutChanged}
-      />
+            {controller.activeTab === 'body' && (
+              <WorkoutBodyTab
+                definitions={controller.bodyMetricsData?.definitions || []}
+                draftValues={controller.metricDrafts}
+                entries={controller.bodyMetricsData?.entries || []}
+                latest={controller.bodyMetricsData?.latest || []}
+                stats={controller.bodyMetricsData?.stats || []}
+                newMetricKind={controller.newBodyMetricKind}
+                newMetricLabel={controller.newBodyMetricLabel}
+                onChangeDraft={(metricKey, value) =>
+                  controller.setMetricDrafts((current) => ({
+                    ...current,
+                    [metricKey]: value,
+                  }))
+                }
+                onCreateDefinition={controller.handleCreateBodyMetricDefinition}
+                onRemoveDefinition={(metricKey) =>
+                  controller.removeMetricDefinitionMutation.mutate({
+                    data: { metricKey },
+                  })
+                }
+                onRemoveEntry={(entryId) =>
+                  controller.removeMetricMutation.mutate({
+                    data: { selectedDay: controller.selectedDay, entryId },
+                  })
+                }
+                onSaveMetric={controller.handleSaveMetric}
+                onSetNewMetricKind={controller.setNewBodyMetricKind}
+                onSetNewMetricLabel={controller.setNewBodyMetricLabel}
+              />
+            )}
+
+            {controller.activeTab === 'history' && (
+              <WorkoutHistoryTab
+                confirmDeleteSetId={controller.confirmDeleteSetId}
+                logs={controller.filteredLogs}
+                onConfirmDeleteSetId={controller.setConfirmDeleteSetId}
+                onRemoveSet={(logId) =>
+                  controller.removeSetMutation.mutate({
+                    data: { selectedDay: controller.selectedDay, logId },
+                  })
+                }
+              />
+            )}
+          </section>
+        )}
+
+        <Chat
+          context={{
+            selectedDay: controller.selectedDay,
+            activeTab: controller.activeTab,
+          }}
+          onWorkoutDataChanged={controller.onAssistantWorkoutChanged}
+        />
+      </div>
     </div>
   )
 }

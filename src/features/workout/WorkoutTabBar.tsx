@@ -25,7 +25,7 @@ interface WorkoutTabBarProps {
 export function WorkoutTabBar({ activeTab, onChange }: WorkoutTabBarProps) {
   return (
     <div className="mb-6 px-1">
-      <div className="flex items-center gap-2 bg-[#2A333E] rounded-2xl p-1.5 border border-slate-700 shadow-[0_12px_30px_rgba(0,0,0,0.2)] overflow-hidden">
+      <div className="flex items-center gap-1.5 overflow-hidden rounded-[1.35rem] border border-white/8 bg-[#111821]/85 p-1.5 shadow-[0_18px_50px_rgba(3,8,20,0.3)] backdrop-blur-xl">
         {WORKOUT_TABS.map((tab) => {
           const Icon = tab.icon
 
@@ -33,10 +33,10 @@ export function WorkoutTabBar({ activeTab, onChange }: WorkoutTabBarProps) {
             <button
               key={tab.value}
               onClick={() => onChange(tab.value)}
-              className={`h-11 rounded-xl text-[9px] font-black uppercase tracking-widest flex items-center justify-center transition-all duration-300 ${
+              className={`flex h-11 items-center justify-center rounded-[1rem] text-[9px] font-black uppercase tracking-[0.22em] transition-all duration-300 ${
                 activeTab === tab.value
-                  ? 'bg-orange-500 text-white shadow-[0_8px_20px_rgba(249,115,22,0.35)] flex-[2.2] px-3 gap-1.5'
-                  : 'text-slate-400 hover:bg-[#364252] hover:text-slate-200 w-11 flex-none px-0'
+                  ? 'flex-[2.2] gap-2 bg-linear-to-b from-orange-400 to-orange-500 px-3 text-white shadow-[0_12px_28px_rgba(249,115,22,0.28)]'
+                  : 'w-11 flex-none px-0 text-slate-500 hover:bg-white/5 hover:text-slate-200'
               }`}
             >
               <Icon size={12} />

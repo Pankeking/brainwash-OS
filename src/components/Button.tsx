@@ -12,17 +12,17 @@ export default function Button({
   ...props
 }: ButtonProps) {
   const baseStyles =
-    'bg-[#2A333E]/50 backdrop-blur-md px-8 py-4 rounded-full border border-slate-700/50 px-6 py-2.5 rounded-xl font-semibold transition-all duration-200 active:scale-95 shadow-lg flex items-center gap-2'
+    'inline-flex items-center justify-center gap-2 rounded-2xl border px-6 py-3 text-sm font-extrabold tracking-[0.04em] transition-all duration-200 shadow-[0_14px_34px_rgba(2,8,23,0.18)] backdrop-blur-xl'
 
   const variants = {
-    // Dark slate with a subtle top highlight
-    primary: 'bg-[#2A333E] text-white shadow-[0_4px_0_0_#1a1f26] hover:bg-[#343e4a]',
-    // The "Goal" orange from the design
-    accent: 'bg-[#D97706] text-white shadow-[0_4px_0_0_#92400E] hover:bg-[#F59E0B]',
-    // The "Task" green
-    secondary: 'bg-[#4D6B53] text-white shadow-[0_4px_0_0_#364d3b] hover:bg-[#5f8266]',
-    // For the MCP Chat bubble
-    ghost: 'bg-transparent text-slate-300 hover:text-white',
+    primary:
+      'border-white/8 bg-linear-to-b from-[#283342] to-[#1b2430] text-white hover:from-[#324052] hover:to-[#222e3c]',
+    accent:
+      'border-orange-300/20 bg-linear-to-b from-orange-400 to-orange-500 text-white shadow-[0_14px_34px_rgba(249,115,22,0.22)] hover:from-orange-300 hover:to-orange-500',
+    secondary:
+      'border-emerald-300/15 bg-linear-to-b from-[#486458] to-[#32463d] text-white hover:from-[#557568] hover:to-[#3b544a]',
+    ghost:
+      'border-transparent bg-transparent text-slate-300 shadow-none hover:bg-white/5 hover:text-white',
   }
 
   return (
