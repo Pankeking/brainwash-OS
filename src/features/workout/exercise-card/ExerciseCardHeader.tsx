@@ -96,26 +96,6 @@ export function ExerciseCardHeader({
                   </div>
                 </div>
               </div>
-              {isExpanded ? (
-                <div className="mt-3 grid grid-cols-2 gap-2 sm:max-w-xs">
-                  <div className="rounded-2xl border border-white/6 bg-[#161d26]/90 px-3 py-2">
-                    <div className="text-[8px] font-black uppercase tracking-[0.18em] text-slate-500">
-                      Weekly progress
-                    </div>
-                    <div className="mt-1 text-sm font-black text-slate-100">
-                      {hasWeeklyGoal ? `${weekSetsDone} / ${weeklySetGoal}` : weekSetsDone}
-                    </div>
-                  </div>
-                  <div className="rounded-2xl border border-white/6 bg-[#161d26]/90 px-3 py-2">
-                    <div className="text-[8px] font-black uppercase tracking-[0.18em] text-slate-500">
-                      Goal state
-                    </div>
-                    <div className="mt-1 text-sm font-black text-slate-100">
-                      {hasWeeklyGoal ? `${goalProgressPct}%` : 'Not set'}
-                    </div>
-                  </div>
-                </div>
-              ) : null}
               <div className="mt-0.5 flex flex-wrap gap-1">
                 {!isExpanded && count > 0 && <span className="sr-only">{count} sets logged</span>}
               </div>

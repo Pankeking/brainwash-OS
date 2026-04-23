@@ -34,7 +34,7 @@ export function ExerciseCardValueStepper({
   onIncrementSmall,
 }: ExerciseCardValueStepperProps) {
   return (
-    <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 rounded-[1.3rem] border border-white/8 bg-[#202834]/88 p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+    <div className="grid gap-2 rounded-[1.3rem] border border-white/8 bg-[#202834]/88 p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] lg:items-center">
       <div className="grid grid-cols-2 gap-2">
         <button
           {...decrementLargeButtonProps}
@@ -52,7 +52,7 @@ export function ExerciseCardValueStepper({
         </button>
       </div>
       <div
-        className={`${centerWidthClassName} rounded-2xl border border-white/8 bg-[#161d26] px-3 py-3 text-center font-mono text-base font-black text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]`}
+        className={`${centerWidthClassName} mx-auto rounded-2xl border border-white/8 bg-[#161d26] px-3 py-3 text-center font-mono text-base font-black text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]`}
       >
         {displayValue}
       </div>

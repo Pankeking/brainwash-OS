@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type PointerEvent } from 'react'
+import { memo, useEffect, useMemo, useRef, useState, type PointerEvent } from 'react'
 
 import { SetType } from '~/enums/enums'
 import { sortCategoriesByColor, sortCategoryIdsByColor } from '~/features/workout/workout.sorting'
@@ -24,7 +24,7 @@ function getInitialStoredValue(storageKey: string, fallback: number) {
   return Math.max(1, Math.round(parsed))
 }
 
-export default function ExerciseActionCard({
+function ExerciseActionCard({
   id,
   name,
   categoryIds,
@@ -160,10 +160,10 @@ export default function ExerciseActionCard({
   return (
     <div
       onClick={() => !isExpanded && !isEditing && onToggleExpand(id)}
-      className={`overflow-hidden rounded-[1.6rem] border border-white/8 transition-all duration-300 ${
+      className={`overflow-hidden rounded-[1.45rem] border border-white/8 transition-all duration-200 ${
         isExpanded
-          ? 'bg-[linear-gradient(180deg,rgba(38,49,63,0.98),rgba(24,31,40,0.96))] p-3.5 shadow-[0_18px_44px_rgba(2,8,23,0.28)] ring-1 ring-orange-500/20'
-          : 'bg-[linear-gradient(180deg,rgba(38,49,63,0.92),rgba(27,35,45,0.96))] p-3 shadow-[0_12px_28px_rgba(2,8,23,0.18)] hover:border-white/12 hover:bg-[linear-gradient(180deg,rgba(44,56,72,0.96),rgba(31,40,51,0.98))]'
+          ? 'bg-[linear-gradient(180deg,rgba(38,49,63,0.98),rgba(24,31,40,0.96))] p-3 shadow-[0_16px_34px_rgba(2,8,23,0.22)] ring-1 ring-orange-500/16'
+          : 'bg-[linear-gradient(180deg,rgba(38,49,63,0.92),rgba(27,35,45,0.96))] p-3 shadow-[0_10px_22px_rgba(2,8,23,0.14)] hover:border-white/12 hover:bg-[linear-gradient(180deg,rgba(44,56,72,0.96),rgba(31,40,51,0.98))]'
       }`}
     >
       <ExerciseCardHeader
@@ -189,9 +189,7 @@ export default function ExerciseActionCard({
 
       <div
         className={`transition-all duration-300 ${
-          isExpanded
-            ? 'mt-3 max-h-[760px] border-t border-white/8 pt-3 opacity-100'
-            : 'max-h-0 opacity-0'
+          isExpanded ? 'mt-3 border-t border-white/8 pt-3 opacity-100' : 'max-h-0 opacity-0'
         }`}
       >
         {isConfirmingDelete ? (
@@ -229,3 +227,46 @@ export default function ExerciseActionCard({
     </div>
   )
 }
+
+function areCategoryArraysEqual(left: string[], right: string[]) {
+  if (left.length !== right.length) {
+    return false
+  }
+  return left.every((value, index) => value === right[index])
+}
+
+function areCategoriesEqual(
+  left: ExerciseActionCardProps['allCategories'],
+  right: ExerciseActionCardProps['allCategories'],
+) {
+  if (left.length !== right.length) {
+    return false
+  }
+  return left.every((category, index) => {
+    const next = right[index]
+    return category.id === next.id && category.name === next.name && category.color === next.color
+  })
+}
+
+const MemoizedExerciseActionCard = memo(
+  ExerciseActionCard,
+  (prevProps, nextProps) =>
+    prevProps.id === nextProps.id &&
+    prevProps.name === nextProps.name &&
+    prevProps.isExpanded === nextProps.isExpanded &&
+    prevProps.count === nextProps.count &&
+    prevProps.preferredSetType === nextProps.preferredSetType &&
+    prevProps.weeklySetGoal === nextProps.weeklySetGoal &&
+    prevProps.setTargetValue === nextProps.setTargetValue &&
+    prevProps.weekSetsDone === nextProps.weekSetsDone &&
+    prevProps.stats.week.best === nextProps.stats.week.best &&
+    prevProps.stats.week.avg === nextProps.stats.week.avg &&
+    prevProps.stats.week.worst === nextProps.stats.week.worst &&
+    prevProps.stats.month.best === nextProps.stats.month.best &&
+    prevProps.stats.month.avg === nextProps.stats.month.avg &&
+    prevProps.stats.month.worst === nextProps.stats.month.worst &&
+    areCategoryArraysEqual(prevProps.categoryIds, nextProps.categoryIds) &&
+    areCategoriesEqual(prevProps.allCategories, nextProps.allCategories),
+)
+
+export default MemoizedExerciseActionCard
