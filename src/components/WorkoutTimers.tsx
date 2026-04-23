@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Hourglass, Timer } from 'lucide-react'
+import { Hourglass, RotateCcw, Square, Timer } from 'lucide-react'
 
 type TimerMode = 'countdown' | 'stopwatch'
 
@@ -114,23 +114,27 @@ export default function WorkoutTimers({ autoStartStopwatchToken = 0 }: WorkoutTi
 
   return (
     <section className="mt-8">
-      <div className="flex justify-between items-center mb-4 px-1">
-        <h2 className="text-[10px] font-black tracking-[0.2em] text-slate-500 uppercase flex items-center gap-2">
+      <div className="mb-4 flex items-center justify-between gap-3 px-1">
+        <h2 className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">
           <Timer size={12} className="text-orange-500" /> Time
         </h2>
-        <div className="flex rounded-lg overflow-hidden border border-slate-700">
+        <div className="flex overflow-hidden rounded-2xl border border-white/8 bg-[#111821]/85 p-1 shadow-[0_16px_40px_rgba(3,8,20,0.24)]">
           <button
             onClick={() => setMode('countdown')}
-            className={`px-3 py-1 text-[9px] font-black uppercase tracking-widest ${
-              mode === 'countdown' ? 'bg-orange-500 text-white' : 'bg-[#1A1F26] text-slate-400'
+            className={`rounded-xl px-3 py-2 text-[9px] font-black uppercase tracking-[0.18em] transition-all ${
+              mode === 'countdown'
+                ? 'bg-orange-500 text-white shadow-[0_8px_18px_rgba(249,115,22,0.22)]'
+                : 'text-slate-400'
             }`}
           >
             Countdown
           </button>
           <button
             onClick={() => setMode('stopwatch')}
-            className={`px-3 py-1 text-[9px] font-black uppercase tracking-widest ${
-              mode === 'stopwatch' ? 'bg-orange-500 text-white' : 'bg-[#1A1F26] text-slate-400'
+            className={`rounded-xl px-3 py-2 text-[9px] font-black uppercase tracking-[0.18em] transition-all ${
+              mode === 'stopwatch'
+                ? 'bg-orange-500 text-white shadow-[0_8px_18px_rgba(249,115,22,0.22)]'
+                : 'text-slate-400'
             }`}
           >
             Stopwatch
@@ -139,48 +143,66 @@ export default function WorkoutTimers({ autoStartStopwatchToken = 0 }: WorkoutTi
       </div>
 
       {mode === 'countdown' ? (
-        <div className="bg-[#2A333E] rounded-2xl border border-slate-700 p-4">
-          <div className="flex items-center gap-2 text-slate-400 mb-3">
-            <Hourglass size={13} />
-            <span className="text-[9px] font-black uppercase tracking-widest">Countdown</span>
+        <div className="rounded-[1.6rem] border border-white/8 bg-[linear-gradient(180deg,rgba(38,49,63,0.98),rgba(24,31,40,0.96))] p-4 shadow-[0_20px_44px_rgba(2,8,23,0.24)]">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2 text-slate-400">
+              <Hourglass size={13} />
+              <span className="text-[9px] font-black uppercase tracking-[0.18em]">Countdown</span>
+            </div>
+            <div className="rounded-full border border-white/8 bg-[#161d26]/90 px-3 py-1 text-[9px] font-black uppercase tracking-[0.18em] text-slate-300">
+              {countdownRunning ? 'Running' : 'Ready'}
+            </div>
           </div>
 
-          <div className="text-center font-mono text-4xl font-black text-orange-400 mb-4">
-            {countdownDisplay}
+          <div className="mb-5 rounded-[1.4rem] border border-white/6 bg-[#161d26]/90 px-4 py-5 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+            <div className="text-[8px] font-black uppercase tracking-[0.18em] text-slate-500">
+              Remaining
+            </div>
+            <div className="mt-2 font-mono text-4xl font-black text-orange-400 sm:text-5xl">
+              {countdownDisplay}
+            </div>
           </div>
 
-          <div className="flex items-center justify-between gap-2 mb-3">
-            <button
-              onClick={() => applyCountdownDuration(countdownDurationSec - 30)}
-              disabled={countdownRunning}
-              className="px-3 py-2 bg-[#1A1F26] border border-slate-700 rounded-lg text-[9px] font-black uppercase tracking-widest text-slate-300 disabled:opacity-40"
-            >
-              -30s
-            </button>
-            <input
-              type="number"
-              min={1}
-              value={countdownDurationSec}
-              onChange={(e) => applyCountdownDuration(Number(e.target.value || 1))}
-              disabled={countdownRunning}
-              className="w-24 bg-[#1A1F26] border border-slate-700 rounded-lg text-center py-2 text-sm font-black text-slate-200 disabled:opacity-40"
-            />
-            <button
-              onClick={() => applyCountdownDuration(countdownDurationSec + 30)}
-              disabled={countdownRunning}
-              className="px-3 py-2 bg-[#1A1F26] border border-slate-700 rounded-lg text-[9px] font-black uppercase tracking-widest text-slate-300 disabled:opacity-40"
-            >
-              +30s
-            </button>
-          </div>
-          <div className="text-center text-[8px] font-black uppercase tracking-widest text-slate-500 mb-4">
-            Duration in seconds
+          <div className="rounded-[1.35rem] border border-white/6 bg-[#161d26]/90 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+            <div className="mb-3 flex items-center gap-2 text-slate-400">
+              <Hourglass size={13} />
+              <span className="text-[9px] font-black uppercase tracking-[0.18em]">
+                Duration setup
+              </span>
+            </div>
+            <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2">
+              <button
+                onClick={() => applyCountdownDuration(countdownDurationSec - 30)}
+                disabled={countdownRunning}
+                className="flex h-11 items-center justify-center rounded-2xl border border-white/8 bg-white/6 px-4 text-[10px] font-black text-slate-300 transition-colors hover:bg-white/10 disabled:opacity-40"
+              >
+                -30s
+              </button>
+              <input
+                type="number"
+                min={1}
+                value={countdownDurationSec}
+                onChange={(e) => applyCountdownDuration(Number(e.target.value || 1))}
+                disabled={countdownRunning}
+                className="h-11 min-w-0 rounded-2xl border border-white/8 bg-[#202834]/85 px-3 text-center text-sm font-black text-slate-200 disabled:opacity-40"
+              />
+              <button
+                onClick={() => applyCountdownDuration(countdownDurationSec + 30)}
+                disabled={countdownRunning}
+                className="flex h-11 items-center justify-center rounded-2xl border border-white/8 bg-white/6 px-4 text-[10px] font-black text-slate-300 transition-colors hover:bg-white/10 disabled:opacity-40"
+              >
+                +30s
+              </button>
+            </div>
+            <div className="mt-3 text-center text-[8px] font-black uppercase tracking-[0.18em] text-slate-500">
+              Duration in seconds
+            </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-2">
+          <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-3">
             <button
               onClick={toggleCountdown}
-              className="py-2.5 bg-orange-600 rounded-xl shadow-[0_3px_0_0_#9a3412] active:translate-y-1 active:shadow-none text-[9px] font-black uppercase tracking-widest"
+              className="h-12 rounded-2xl bg-orange-500 text-[9px] font-black uppercase tracking-[0.2em] text-white shadow-[0_14px_28px_rgba(249,115,22,0.24)] transition-transform active:translate-y-[1px]"
             >
               {countdownRunning ? 'Pause' : 'Start'}
             </button>
@@ -189,8 +211,9 @@ export default function WorkoutTimers({ autoStartStopwatchToken = 0 }: WorkoutTi
                 setCountdownRunning(false)
                 setCountdownRemainingMs(countdownDurationSec * 1000)
               }}
-              className="py-2.5 bg-[#1A1F26] border border-slate-700 rounded-xl text-[9px] font-black uppercase tracking-widest text-slate-300"
+              className="flex h-12 items-center justify-center gap-2 rounded-2xl border border-white/8 bg-[#161d26]/90 text-[9px] font-black uppercase tracking-[0.2em] text-slate-300"
             >
+              <RotateCcw size={12} />
               Reset
             </button>
             <button
@@ -198,34 +221,46 @@ export default function WorkoutTimers({ autoStartStopwatchToken = 0 }: WorkoutTi
                 setCountdownRunning(false)
                 setCountdownRemainingMs(0)
               }}
-              className="py-2.5 bg-[#1A1F26] border border-slate-700 rounded-xl text-[9px] font-black uppercase tracking-widest text-slate-300"
+              className="flex h-12 items-center justify-center gap-2 rounded-2xl border border-white/8 bg-[#161d26]/90 text-[9px] font-black uppercase tracking-[0.2em] text-slate-300"
             >
+              <Square size={12} />
               End
             </button>
           </div>
         </div>
       ) : (
-        <div className="bg-[#2A333E] rounded-2xl border border-slate-700 p-4">
-          <div className="flex items-center gap-2 text-slate-400 mb-3">
-            <Timer size={13} />
-            <span className="text-[9px] font-black uppercase tracking-widest">Stopwatch</span>
+        <div className="rounded-[1.6rem] border border-white/8 bg-[linear-gradient(180deg,rgba(38,49,63,0.98),rgba(24,31,40,0.96))] p-4 shadow-[0_20px_44px_rgba(2,8,23,0.24)]">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2 text-slate-400">
+              <Timer size={13} />
+              <span className="text-[9px] font-black uppercase tracking-[0.18em]">Stopwatch</span>
+            </div>
+            <div className="rounded-full border border-white/8 bg-[#161d26]/90 px-3 py-1 text-[9px] font-black uppercase tracking-[0.18em] text-slate-300">
+              {stopwatchRunning ? 'Running' : stopwatchMs > 0 ? 'Paused' : 'Ready'}
+            </div>
           </div>
 
-          <div className="text-center font-mono text-4xl font-black text-orange-400 mb-4">
-            {stopwatchDisplay}
+          <div className="mb-5 rounded-[1.4rem] border border-white/6 bg-[#161d26]/90 px-4 py-5 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+            <div className="text-[8px] font-black uppercase tracking-[0.18em] text-slate-500">
+              Elapsed
+            </div>
+            <div className="mt-2 font-mono text-4xl font-black text-orange-400 sm:text-5xl">
+              {stopwatchDisplay}
+            </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
             <button
               onClick={toggleStopwatch}
-              className="py-2.5 bg-orange-600 rounded-xl shadow-[0_3px_0_0_#9a3412] active:translate-y-1 active:shadow-none text-[9px] font-black uppercase tracking-widest"
+              className="h-12 rounded-2xl bg-orange-500 text-[9px] font-black uppercase tracking-[0.2em] text-white shadow-[0_14px_28px_rgba(249,115,22,0.24)] transition-transform active:translate-y-[1px]"
             >
               {stopwatchRunning ? 'Pause' : 'Start'}
             </button>
             <button
               onClick={() => setStopwatchRunning(false)}
-              className="py-2.5 bg-[#1A1F26] border border-slate-700 rounded-xl text-[9px] font-black uppercase tracking-widest text-slate-300"
+              className="flex h-12 items-center justify-center gap-2 rounded-2xl border border-white/8 bg-[#161d26]/90 text-[9px] font-black uppercase tracking-[0.2em] text-slate-300"
             >
+              <Square size={12} />
               Stop
             </button>
             <button
@@ -233,8 +268,9 @@ export default function WorkoutTimers({ autoStartStopwatchToken = 0 }: WorkoutTi
                 setStopwatchRunning(false)
                 setStopwatchMs(0)
               }}
-              className="py-2.5 bg-[#1A1F26] border border-slate-700 rounded-xl text-[9px] font-black uppercase tracking-widest text-slate-300"
+              className="flex h-12 items-center justify-center gap-2 rounded-2xl border border-white/8 bg-[#161d26]/90 text-[9px] font-black uppercase tracking-[0.2em] text-slate-300"
             >
+              <RotateCcw size={12} />
               Reset
             </button>
           </div>
