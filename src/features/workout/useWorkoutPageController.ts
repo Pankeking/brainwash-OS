@@ -30,6 +30,7 @@ import { useWorkoutSetMutations } from './useWorkoutSetMutations'
 
 interface WorkoutLoaderData {
   selectedDay: string
+  userId: string
 }
 
 type WorkoutDayQueryData = {
@@ -60,11 +61,15 @@ export function useWorkoutPageController(loaderData: WorkoutLoaderData) {
     setTimerAutoStartToken((current) => current + 1)
   }
 
-  const { data, isLoading } = useQuery<WorkoutDayQueryData>(getWorkoutDayQueryOptions(selectedDay))
+  const { data, isLoading } = useQuery<WorkoutDayQueryData>(
+    getWorkoutDayQueryOptions(loaderData.userId, selectedDay),
+  )
   const { data: weeklyStatsData, isLoading: isWeeklyStatsLoading } =
-    useQuery<WeeklyCategoryStatsData>(getWorkoutWeeklyCategoryStatsQueryOptions(weeksToShow))
+    useQuery<WeeklyCategoryStatsData>(
+      getWorkoutWeeklyCategoryStatsQueryOptions(loaderData.userId, weeksToShow),
+    )
   const { data: bodyMetricsData } = useQuery<BodyMetricsDayData>(
-    getBodyMetricsDayQueryOptions(selectedDay),
+    getBodyMetricsDayQueryOptions(loaderData.userId, selectedDay),
   )
 
   const categories: WorkoutCategory[] = data?.categories || []
@@ -79,6 +84,7 @@ export function useWorkoutPageController(loaderData: WorkoutLoaderData) {
       },
       queryClient,
       selectedDay,
+      userId: loaderData.userId,
       weeksToShow,
     })
   const {
@@ -94,6 +100,7 @@ export function useWorkoutPageController(loaderData: WorkoutLoaderData) {
     },
     queryClient,
     selectedDay,
+    userId: loaderData.userId,
     weeksToShow,
   })
   const { addSetMutation, removeSetMutation } = useWorkoutSetMutations({
@@ -104,6 +111,7 @@ export function useWorkoutPageController(loaderData: WorkoutLoaderData) {
         tone: 'error',
       }),
     queryClient,
+    userId: loaderData.userId,
     weeksToShow,
   })
   const {
@@ -114,6 +122,7 @@ export function useWorkoutPageController(loaderData: WorkoutLoaderData) {
   } = useBodyMetricMutations({
     queryClient,
     selectedDay,
+    userId: loaderData.userId,
   })
 
   const filteredLogs = useMemo(() => logs.slice().reverse(), [logs])

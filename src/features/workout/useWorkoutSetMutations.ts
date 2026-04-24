@@ -3,6 +3,10 @@ import { useMutation, type QueryClient } from '@tanstack/react-query'
 import { SetType } from '~/enums/enums'
 import { addWorkoutSetFn, removeWorkoutSetFn } from '~/server/workout'
 
+import {
+  getWorkoutDayQueryKey,
+  getWorkoutWeeklyCategoryStatsQueryKey,
+} from './workout.query-options'
 import type { WorkoutDayData, WorkoutLog } from './workout.types'
 
 type MutationContext = {
@@ -13,6 +17,7 @@ interface UseWorkoutSetMutationsArgs {
   onRemovedSet: () => void
   onSetLogFailed: () => void
   queryClient: QueryClient
+  userId: string
   weeksToShow: number
 }
 
@@ -20,15 +25,19 @@ export function useWorkoutSetMutations({
   onRemovedSet,
   onSetLogFailed,
   queryClient,
+  userId,
   weeksToShow,
 }: UseWorkoutSetMutationsArgs) {
   const refreshWorkoutDay = async (dayKey: string) => {
-    await queryClient.invalidateQueries({ queryKey: ['workout-day', dayKey] })
-    await queryClient.refetchQueries({ queryKey: ['workout-day', dayKey], type: 'all' })
+    const queryKey = getWorkoutDayQueryKey(userId, dayKey)
+    await queryClient.invalidateQueries({ queryKey })
+    await queryClient.refetchQueries({ queryKey, type: 'all' })
   }
 
   const invalidateWeeklyStats = () =>
-    queryClient.invalidateQueries({ queryKey: ['workout-weekly-category-stats', weeksToShow] })
+    queryClient.invalidateQueries({
+      queryKey: getWorkoutWeeklyCategoryStatsQueryKey(userId, weeksToShow),
+    })
 
   const addSetMutation = useMutation({
     mutationFn: (input: {
@@ -42,8 +51,9 @@ export function useWorkoutSetMutations({
     }) => addWorkoutSetFn(input),
     onMutate: async (newSet) => {
       const dayKey = newSet.data.selectedDay
-      await queryClient.cancelQueries({ queryKey: ['workout-day', dayKey] })
-      const previousData = queryClient.getQueryData<WorkoutDayData>(['workout-day', dayKey])
+      const queryKey = getWorkoutDayQueryKey(userId, dayKey)
+      await queryClient.cancelQueries({ queryKey })
+      const previousData = queryClient.getQueryData<WorkoutDayData>(queryKey)
 
       if (previousData) {
         const exercise = previousData.exercises.find((item) => item.id === newSet.data.exerciseId)
@@ -58,7 +68,7 @@ export function useWorkoutSetMutations({
           timestamp: new Date().toISOString(),
         }
 
-        queryClient.setQueryData<WorkoutDayData>(['workout-day', dayKey], (current) =>
+        queryClient.setQueryData<WorkoutDayData>(queryKey, (current) =>
           current
             ? {
                 ...current,
@@ -77,7 +87,10 @@ export function useWorkoutSetMutations({
     },
     onError: (_error, newSet, context?: MutationContext) => {
       if (context?.previousData) {
-        queryClient.setQueryData(['workout-day', newSet.data.selectedDay], context.previousData)
+        queryClient.setQueryData(
+          getWorkoutDayQueryKey(userId, newSet.data.selectedDay),
+          context.previousData,
+        )
       }
       onSetLogFailed()
     },
@@ -92,13 +105,14 @@ export function useWorkoutSetMutations({
       removeWorkoutSetFn(input),
     onMutate: async (variables) => {
       const dayKey = variables.data.selectedDay
-      await queryClient.cancelQueries({ queryKey: ['workout-day', dayKey] })
-      const previousData = queryClient.getQueryData<WorkoutDayData>(['workout-day', dayKey])
+      const queryKey = getWorkoutDayQueryKey(userId, dayKey)
+      await queryClient.cancelQueries({ queryKey })
+      const previousData = queryClient.getQueryData<WorkoutDayData>(queryKey)
 
       if (previousData) {
         const logToRemove = previousData.logs.find((log) => log.id === variables.data.logId)
         if (logToRemove) {
-          queryClient.setQueryData<WorkoutDayData>(['workout-day', dayKey], (current) =>
+          queryClient.setQueryData<WorkoutDayData>(queryKey, (current) =>
             current
               ? {
                   ...current,
@@ -118,7 +132,10 @@ export function useWorkoutSetMutations({
     },
     onError: (_error, variables, context?: MutationContext) => {
       if (context?.previousData) {
-        queryClient.setQueryData(['workout-day', variables.data.selectedDay], context.previousData)
+        queryClient.setQueryData(
+          getWorkoutDayQueryKey(userId, variables.data.selectedDay),
+          context.previousData,
+        )
       }
     },
     onSettled: (_data, _error, variables) => {

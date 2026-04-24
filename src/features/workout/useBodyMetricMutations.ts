@@ -7,17 +7,24 @@ import {
   upsertBodyMetricFn,
 } from '~/server/workout'
 
+import { getBodyMetricsDayQueryKey } from './workout.query-options'
 import type { BodyMetricsDayData } from './workout.types'
 
 interface UseBodyMetricMutationsArgs {
   queryClient: QueryClient
   selectedDay: string
+  userId: string
 }
 
-export function useBodyMetricMutations({ queryClient, selectedDay }: UseBodyMetricMutationsArgs) {
+export function useBodyMetricMutations({
+  queryClient,
+  selectedDay,
+  userId,
+}: UseBodyMetricMutationsArgs) {
   const refreshBodyMetrics = async () => {
-    await queryClient.invalidateQueries({ queryKey: ['body-metrics-day', selectedDay] })
-    await queryClient.refetchQueries({ queryKey: ['body-metrics-day', selectedDay], type: 'all' })
+    const queryKey = getBodyMetricsDayQueryKey(userId, selectedDay)
+    await queryClient.invalidateQueries({ queryKey })
+    await queryClient.refetchQueries({ queryKey, type: 'all' })
   }
 
   const upsertMetricMutation = useMutation({
@@ -32,14 +39,12 @@ export function useBodyMetricMutations({ queryClient, selectedDay }: UseBodyMetr
     mutationFn: (input: { data: { selectedDay: string; entryId: string } }) =>
       removeBodyMetricFn(input),
     onMutate: async (variables) => {
-      await queryClient.cancelQueries({ queryKey: ['body-metrics-day', selectedDay] })
-      const previousData = queryClient.getQueryData<BodyMetricsDayData>([
-        'body-metrics-day',
-        selectedDay,
-      ])
+      const queryKey = getBodyMetricsDayQueryKey(userId, selectedDay)
+      await queryClient.cancelQueries({ queryKey })
+      const previousData = queryClient.getQueryData<BodyMetricsDayData>(queryKey)
 
       if (previousData) {
-        queryClient.setQueryData<BodyMetricsDayData>(['body-metrics-day', selectedDay], {
+        queryClient.setQueryData<BodyMetricsDayData>(queryKey, {
           ...previousData,
           entries: previousData.entries.filter((entry) => entry.id !== variables.data.entryId),
         })
@@ -49,7 +54,10 @@ export function useBodyMetricMutations({ queryClient, selectedDay }: UseBodyMetr
     },
     onError: (_error, _variables, context) => {
       if (context?.previousData) {
-        queryClient.setQueryData(['body-metrics-day', selectedDay], context.previousData)
+        queryClient.setQueryData(
+          getBodyMetricsDayQueryKey(userId, selectedDay),
+          context.previousData,
+        )
       }
     },
     onSettled: () => {

@@ -9,6 +9,10 @@ import {
   updateWorkoutExerciseWeeklyGoalFn,
 } from '~/server/workout'
 
+import {
+  getWorkoutDayQueryKey,
+  getWorkoutWeeklyCategoryStatsQueryKey,
+} from './workout.query-options'
 import type { WorkoutDayData, WorkoutExercise } from './workout.types'
 
 type MutationContext = {
@@ -19,6 +23,7 @@ interface UseWorkoutExerciseMutationsArgs {
   onAddedExercise: () => void
   queryClient: QueryClient
   selectedDay: string
+  userId: string
   weeksToShow: number
 }
 
@@ -26,23 +31,28 @@ export function useWorkoutExerciseMutations({
   onAddedExercise,
   queryClient,
   selectedDay,
+  userId,
   weeksToShow,
 }: UseWorkoutExerciseMutationsArgs) {
   const refreshWorkoutDay = async (dayKey: string) => {
-    await queryClient.invalidateQueries({ queryKey: ['workout-day', dayKey] })
-    await queryClient.refetchQueries({ queryKey: ['workout-day', dayKey], type: 'all' })
+    const queryKey = getWorkoutDayQueryKey(userId, dayKey)
+    await queryClient.invalidateQueries({ queryKey })
+    await queryClient.refetchQueries({ queryKey, type: 'all' })
   }
 
   const invalidateWeeklyStats = () =>
-    queryClient.invalidateQueries({ queryKey: ['workout-weekly-category-stats', weeksToShow] })
+    queryClient.invalidateQueries({
+      queryKey: getWorkoutWeeklyCategoryStatsQueryKey(userId, weeksToShow),
+    })
 
   const addExerciseMutation = useMutation({
     mutationFn: (input: { data: { selectedDay: string; name: string } }) =>
       addWorkoutExerciseFn(input),
     onMutate: async (newExercise) => {
       const dayKey = newExercise.data.selectedDay
-      await queryClient.cancelQueries({ queryKey: ['workout-day', dayKey] })
-      const previousData = queryClient.getQueryData<WorkoutDayData>(['workout-day', dayKey])
+      const queryKey = getWorkoutDayQueryKey(userId, dayKey)
+      await queryClient.cancelQueries({ queryKey })
+      const previousData = queryClient.getQueryData<WorkoutDayData>(queryKey)
 
       if (previousData) {
         const tempExercise: WorkoutExercise = {
@@ -61,7 +71,7 @@ export function useWorkoutExerciseMutations({
           },
         }
 
-        queryClient.setQueryData<WorkoutDayData>(['workout-day', dayKey], (current) =>
+        queryClient.setQueryData<WorkoutDayData>(queryKey, (current) =>
           current ? { ...current, exercises: [...current.exercises, tempExercise] } : current,
         )
       }
@@ -72,7 +82,7 @@ export function useWorkoutExerciseMutations({
     onError: (_error, newExercise, context?: MutationContext) => {
       if (context?.previousData) {
         queryClient.setQueryData(
-          ['workout-day', newExercise.data.selectedDay],
+          getWorkoutDayQueryKey(userId, newExercise.data.selectedDay),
           context.previousData,
         )
       }
@@ -88,11 +98,12 @@ export function useWorkoutExerciseMutations({
       removeWorkoutExerciseFn(input),
     onMutate: async (variables) => {
       const dayKey = variables.data.selectedDay
-      await queryClient.cancelQueries({ queryKey: ['workout-day', dayKey] })
-      const previousData = queryClient.getQueryData<WorkoutDayData>(['workout-day', dayKey])
+      const queryKey = getWorkoutDayQueryKey(userId, dayKey)
+      await queryClient.cancelQueries({ queryKey })
+      const previousData = queryClient.getQueryData<WorkoutDayData>(queryKey)
 
       if (previousData) {
-        queryClient.setQueryData<WorkoutDayData>(['workout-day', dayKey], (current) =>
+        queryClient.setQueryData<WorkoutDayData>(queryKey, (current) =>
           current
             ? {
                 ...current,
@@ -109,7 +120,10 @@ export function useWorkoutExerciseMutations({
     },
     onError: (_error, variables, context?: MutationContext) => {
       if (context?.previousData) {
-        queryClient.setQueryData(['workout-day', variables.data.selectedDay], context.previousData)
+        queryClient.setQueryData(
+          getWorkoutDayQueryKey(userId, variables.data.selectedDay),
+          context.previousData,
+        )
       }
     },
     onSettled: (_data, _error, variables) => {
@@ -122,11 +136,12 @@ export function useWorkoutExerciseMutations({
     mutationFn: (input: { data: { exerciseId: string; nextName: string } }) =>
       renameWorkoutExerciseFn(input),
     onMutate: async (variables) => {
-      await queryClient.cancelQueries({ queryKey: ['workout-day', selectedDay] })
-      const previousData = queryClient.getQueryData<WorkoutDayData>(['workout-day', selectedDay])
+      const queryKey = getWorkoutDayQueryKey(userId, selectedDay)
+      await queryClient.cancelQueries({ queryKey })
+      const previousData = queryClient.getQueryData<WorkoutDayData>(queryKey)
 
       if (previousData) {
-        queryClient.setQueryData<WorkoutDayData>(['workout-day', selectedDay], (current) =>
+        queryClient.setQueryData<WorkoutDayData>(queryKey, (current) =>
           current
             ? {
                 ...current,
@@ -149,7 +164,7 @@ export function useWorkoutExerciseMutations({
     },
     onError: (_error, _variables, context?: MutationContext) => {
       if (context?.previousData) {
-        queryClient.setQueryData(['workout-day', selectedDay], context.previousData)
+        queryClient.setQueryData(getWorkoutDayQueryKey(userId, selectedDay), context.previousData)
       }
     },
     onSettled: () => {
@@ -162,11 +177,12 @@ export function useWorkoutExerciseMutations({
     mutationFn: (input: { data: { exerciseId: string; categoryId: string } }) =>
       toggleWorkoutExerciseCategoryFn(input),
     onMutate: async (variables) => {
-      await queryClient.cancelQueries({ queryKey: ['workout-day', selectedDay] })
-      const previousData = queryClient.getQueryData<WorkoutDayData>(['workout-day', selectedDay])
+      const queryKey = getWorkoutDayQueryKey(userId, selectedDay)
+      await queryClient.cancelQueries({ queryKey })
+      const previousData = queryClient.getQueryData<WorkoutDayData>(queryKey)
 
       if (previousData) {
-        queryClient.setQueryData<WorkoutDayData>(['workout-day', selectedDay], (current) =>
+        queryClient.setQueryData<WorkoutDayData>(queryKey, (current) =>
           current
             ? {
                 ...current,
@@ -188,7 +204,7 @@ export function useWorkoutExerciseMutations({
     },
     onError: (_error, _variables, context?: MutationContext) => {
       if (context?.previousData) {
-        queryClient.setQueryData(['workout-day', selectedDay], context.previousData)
+        queryClient.setQueryData(getWorkoutDayQueryKey(userId, selectedDay), context.previousData)
       }
     },
     onSettled: () => {
@@ -208,11 +224,12 @@ export function useWorkoutExerciseMutations({
       }
     }) => updateWorkoutExerciseWeeklyGoalFn(input),
     onMutate: async (variables) => {
-      await queryClient.cancelQueries({ queryKey: ['workout-day', selectedDay] })
-      const previousData = queryClient.getQueryData<WorkoutDayData>(['workout-day', selectedDay])
+      const queryKey = getWorkoutDayQueryKey(userId, selectedDay)
+      await queryClient.cancelQueries({ queryKey })
+      const previousData = queryClient.getQueryData<WorkoutDayData>(queryKey)
 
       if (previousData) {
-        queryClient.setQueryData<WorkoutDayData>(['workout-day', selectedDay], (current) =>
+        queryClient.setQueryData<WorkoutDayData>(queryKey, (current) =>
           current
             ? {
                 ...current,
@@ -245,7 +262,7 @@ export function useWorkoutExerciseMutations({
     },
     onError: (_error, _variables, context?: MutationContext) => {
       if (context?.previousData) {
-        queryClient.setQueryData(['workout-day', selectedDay], context.previousData)
+        queryClient.setQueryData(getWorkoutDayQueryKey(userId, selectedDay), context.previousData)
       }
     },
     onSettled: () => {

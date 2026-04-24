@@ -34,20 +34,21 @@ export const Route = createFileRoute('/_authed/workout')({
     })
 
     context.queryClient.setQueryData(
-      getWorkoutDayQueryOptions(pageData.selectedDay).queryKey,
+      getWorkoutDayQueryOptions(pageData.userId, pageData.selectedDay).queryKey,
       pageData.workoutDayData,
     )
     context.queryClient.setQueryData(
-      getWorkoutWeeklyCategoryStatsQueryOptions(INITIAL_WEEKS_TO_SHOW).queryKey,
+      getWorkoutWeeklyCategoryStatsQueryOptions(pageData.userId, INITIAL_WEEKS_TO_SHOW).queryKey,
       pageData.weeklyStatsData,
     )
     context.queryClient.setQueryData(
-      getBodyMetricsDayQueryOptions(pageData.selectedDay).queryKey,
+      getBodyMetricsDayQueryOptions(pageData.userId, pageData.selectedDay).queryKey,
       pageData.bodyMetricsData,
     )
 
     return {
       selectedDay: pageData.selectedDay,
+      userId: pageData.userId,
     }
   },
   component: WorkoutView,

@@ -26,6 +26,7 @@ export const getWorkoutPageDataFn = createServerFn({ method: 'POST' })
     return {
       bodyMetricsData,
       selectedDay: workoutDayData.selectedDay,
+      userId: String(userId),
       weeklyStatsData,
       workoutDayData: workoutDayData.data,
     }

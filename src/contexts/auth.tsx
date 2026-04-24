@@ -10,6 +10,7 @@ type User = {
 
 type AuthContextType = {
   user: User | null | undefined
+  error: Error | null
   isLoading: boolean
   refetch: () => Promise<unknown>
 }
@@ -17,10 +18,12 @@ type AuthContextType = {
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const { data: user, isLoading, refetch } = useQuery<User | null>(currentUserQueryOptions)
+  const { data: user, error, isLoading, refetch } = useQuery<User | null>(currentUserQueryOptions)
 
   return (
-    <AuthContext.Provider value={{ user, isLoading, refetch }}>{children}</AuthContext.Provider>
+    <AuthContext.Provider value={{ user, error, isLoading, refetch }}>
+      {children}
+    </AuthContext.Provider>
   )
 }
 

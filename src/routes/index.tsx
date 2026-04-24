@@ -1,6 +1,8 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { ArrowRight, GithubIcon, Sparkles, Timer, Dumbbell } from 'lucide-react'
 import { useAuth } from '~/contexts/auth'
+import { currentUserQueryOptions } from '~/features/auth/currentUserQuery'
+import { clearWorkoutUserQueries } from '~/features/workout/workout.cache'
 import { logoutFn, initiateOAuthFn } from '~/server/auth'
 import { Hero, Chat, Button } from '~/components/components'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
@@ -33,15 +35,16 @@ function getLoginRedirectTarget(rawRedirect?: string) {
 }
 
 function Home() {
-  const { user, isLoading, refetch } = useAuth()
+  const { user, error, isLoading, refetch } = useAuth()
 
   const queryClient = useQueryClient()
 
   const logoutMutation = useMutation({
     mutationFn: logoutFn,
     onSuccess: async () => {
+      clearWorkoutUserQueries(queryClient, user?.id)
+      queryClient.setQueryData(currentUserQueryOptions.queryKey, null)
       await refetch()
-      queryClient.invalidateQueries({ queryKey: ['currentUser'] })
     },
   })
   const initiateOAuthMutation = useMutation({
@@ -67,6 +70,17 @@ function Home() {
     return (
       <div className="min-h-screen bg-[#1A1F26] text-slate-100 flex flex-col items-center justify-center p-6">
         Loading authentication status...
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-[#1A1F26] text-slate-100 flex flex-col items-center justify-center p-6 text-center">
+        <div className="text-lg font-black">Authentication check failed.</div>
+        <p className="mt-2 text-sm text-slate-400">
+          Reload the page and verify the server is reachable.
+        </p>
       </div>
     )
   }

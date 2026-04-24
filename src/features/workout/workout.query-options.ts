@@ -4,27 +4,39 @@ import {
   getWorkoutWeeklyCategoryStatsFn,
 } from '~/server/workout'
 
-export function getWorkoutDayQueryOptions(selectedDay: string) {
+export function getWorkoutDayQueryKey(userId: string, selectedDay: string) {
+  return ['workout-day', userId, selectedDay] as const
+}
+
+export function getWorkoutWeeklyCategoryStatsQueryKey(userId: string, weeks: number) {
+  return ['workout-weekly-category-stats', userId, weeks] as const
+}
+
+export function getBodyMetricsDayQueryKey(userId: string, selectedDay: string) {
+  return ['body-metrics-day', userId, selectedDay] as const
+}
+
+export function getWorkoutDayQueryOptions(userId: string, selectedDay: string) {
   return {
-    queryKey: ['workout-day', selectedDay] as const,
+    queryKey: getWorkoutDayQueryKey(userId, selectedDay),
     queryFn: () => getWorkoutDayFn({ data: { selectedDay } }),
     staleTime: 30_000,
     refetchOnWindowFocus: false,
   }
 }
 
-export function getWorkoutWeeklyCategoryStatsQueryOptions(weeks: number) {
+export function getWorkoutWeeklyCategoryStatsQueryOptions(userId: string, weeks: number) {
   return {
-    queryKey: ['workout-weekly-category-stats', weeks] as const,
+    queryKey: getWorkoutWeeklyCategoryStatsQueryKey(userId, weeks),
     queryFn: () => getWorkoutWeeklyCategoryStatsFn({ data: { weeks } }),
     staleTime: 30_000,
     refetchOnWindowFocus: false,
   }
 }
 
-export function getBodyMetricsDayQueryOptions(selectedDay: string) {
+export function getBodyMetricsDayQueryOptions(userId: string, selectedDay: string) {
   return {
-    queryKey: ['body-metrics-day', selectedDay] as const,
+    queryKey: getBodyMetricsDayQueryKey(userId, selectedDay),
     queryFn: () => getBodyMetricsDayFn({ data: { selectedDay } }),
     staleTime: 30_000,
     refetchOnWindowFocus: false,
