@@ -1,16 +1,13 @@
 import React from 'react'
 
+export type ButtonVariant = 'primary' | 'secondary' | 'accent' | 'ghost'
+
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: 'primary' | 'secondary' | 'accent' | 'ghost'
+  variant?: ButtonVariant
   children: React.ReactNode
 }
 
-export default function Button({
-  variant = 'primary',
-  children,
-  className,
-  ...props
-}: ButtonProps) {
+export function getButtonClassName(variant: ButtonVariant = 'primary', className = '') {
   const baseStyles =
     'inline-flex items-center justify-center gap-2 rounded-2xl border px-6 py-3 text-sm font-extrabold tracking-[0.04em] transition-all duration-200 shadow-[0_14px_34px_rgba(2,8,23,0.18)] backdrop-blur-xl'
 
@@ -25,8 +22,17 @@ export default function Button({
       'border-transparent bg-transparent text-slate-300 shadow-none hover:bg-white/5 hover:text-white',
   }
 
+  return `${baseStyles} ${variants[variant]} ${className}`
+}
+
+export default function Button({
+  variant = 'primary',
+  children,
+  className,
+  ...props
+}: ButtonProps) {
   return (
-    <button className={`${baseStyles} ${variants[variant]} ${className}`} {...props}>
+    <button className={getButtonClassName(variant, className)} {...props}>
       {children}
     </button>
   )

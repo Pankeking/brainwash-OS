@@ -1,34 +1,19 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { ArrowRight, GithubIcon, Sparkles, Timer, Dumbbell } from 'lucide-react'
-import { useState } from 'react'
+import { type MouseEvent, useState } from 'react'
 import { useAuth } from '~/contexts/auth'
 import { currentUserQueryOptions } from '~/features/auth/currentUserQuery'
 import { clearWorkoutUserQueries } from '~/features/workout/workout.cache'
 import { logoutFn } from '~/server/auth'
 import { Hero, Chat, Button } from '~/components/components'
+import { getButtonClassName } from '~/components/Button'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 
 export const Route = createFileRoute('/')({
   component: Home,
 })
 
-function getLoginRedirectTarget(rawRedirect?: string) {
-  if (!rawRedirect) {
-    return '/workout'
-  }
-  if (rawRedirect.startsWith('/') && !rawRedirect.startsWith('//')) {
-    return rawRedirect
-  }
-  try {
-    const parsed = new URL(rawRedirect, window.location.origin)
-    if (parsed.origin !== window.location.origin) {
-      return '/workout'
-    }
-    return `${parsed.pathname}${parsed.search}${parsed.hash}` || '/workout'
-  } catch {
-    return '/workout'
-  }
-}
+const GITHUB_LOGIN_HREF = `/auth/github?${new URLSearchParams({ redirect: '/workout' })}`
 
 function Home() {
   const { user, error, isLoading, refetch } = useAuth()
@@ -48,13 +33,14 @@ function Home() {
     logoutMutation.mutate(undefined)
   }
 
-  const handleGitHubLogin = () => {
-    const searchParams = new URLSearchParams(window.location.search)
-    const redirectTo = getLoginRedirectTarget(searchParams.get('redirect') || undefined)
-    const nextLocation = new URL('/auth/github', window.location.origin)
-    nextLocation.searchParams.set('redirect', redirectTo)
+  const isLoginDisabled = isRedirectingToLogin || logoutMutation.isPending
+
+  const handleGitHubLogin = (event: MouseEvent<HTMLAnchorElement>) => {
+    if (isLoginDisabled) {
+      event.preventDefault()
+      return
+    }
     setIsRedirectingToLogin(true)
-    window.location.assign(nextLocation.toString())
   }
 
   return (
@@ -139,18 +125,23 @@ function Home() {
                     </Button>
                   </>
                 ) : (
-                  <Button
-                    variant="accent"
+                  <a
+                    href={GITHUB_LOGIN_HREF}
                     onClick={handleGitHubLogin}
-                    className="h-12 w-full justify-between px-4"
-                    disabled={isRedirectingToLogin || logoutMutation.isPending}
+                    aria-disabled={isLoginDisabled}
+                    className={getButtonClassName(
+                      'accent',
+                      `h-12 w-full justify-between px-4 ${
+                        isLoginDisabled ? 'pointer-events-none opacity-70' : ''
+                      }`,
+                    )}
                   >
                     <span className="flex items-center gap-2">
                       <GithubIcon size={18} className="text-white" />
                       {isRedirectingToLogin ? 'Redirecting to GitHub...' : 'Continue with GitHub'}
                     </span>
                     <ArrowRight size={16} />
-                  </Button>
+                  </a>
                 )}
               </div>
             </div>

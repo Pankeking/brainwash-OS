@@ -1,10 +1,10 @@
 import { createFileRoute, redirect } from '@tanstack/react-router'
 import { githubAuthCallbackFn } from '~/server/auth'
 
-export const Route = createFileRoute('/auth/github/callback')({
+export const Route = createFileRoute('/auth/github_/callback')({
   validateSearch: (search: Record<string, unknown>) => ({
-    code: search.code as string,
-    state: search.state as string,
+    code: typeof search.code === 'string' ? search.code : '',
+    state: typeof search.state === 'string' ? search.state : '',
   }),
   loaderDeps: ({ search: { code, state } }) => ({ code, state }),
   loader: async ({ deps }) => {

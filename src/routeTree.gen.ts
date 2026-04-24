@@ -13,7 +13,7 @@ import { Route as AuthedRouteImport } from './routes/_authed'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthGithubRouteImport } from './routes/auth.github'
 import { Route as AuthedWorkoutRouteImport } from './routes/_authed.workout'
-import { Route as AuthGithubCallbackRouteImport } from './routes/auth.github.callback'
+import { Route as AuthGithubCallbackRouteImport } from './routes/auth.github_.callback'
 
 const AuthedRoute = AuthedRouteImport.update({
   id: '/_authed',
@@ -35,21 +35,21 @@ const AuthedWorkoutRoute = AuthedWorkoutRouteImport.update({
   getParentRoute: () => AuthedRoute,
 } as any)
 const AuthGithubCallbackRoute = AuthGithubCallbackRouteImport.update({
-  id: '/callback',
-  path: '/callback',
-  getParentRoute: () => AuthGithubRoute,
+  id: '/auth/github_/callback',
+  path: '/auth/github/callback',
+  getParentRoute: () => rootRouteImport,
 } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/workout': typeof AuthedWorkoutRoute
-  '/auth/github': typeof AuthGithubRouteWithChildren
+  '/auth/github': typeof AuthGithubRoute
   '/auth/github/callback': typeof AuthGithubCallbackRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/workout': typeof AuthedWorkoutRoute
-  '/auth/github': typeof AuthGithubRouteWithChildren
+  '/auth/github': typeof AuthGithubRoute
   '/auth/github/callback': typeof AuthGithubCallbackRoute
 }
 export interface FileRoutesById {
@@ -57,8 +57,8 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/_authed': typeof AuthedRouteWithChildren
   '/_authed/workout': typeof AuthedWorkoutRoute
-  '/auth/github': typeof AuthGithubRouteWithChildren
-  '/auth/github/callback': typeof AuthGithubCallbackRoute
+  '/auth/github': typeof AuthGithubRoute
+  '/auth/github_/callback': typeof AuthGithubCallbackRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -71,13 +71,14 @@ export interface FileRouteTypes {
     | '/_authed'
     | '/_authed/workout'
     | '/auth/github'
-    | '/auth/github/callback'
+    | '/auth/github_/callback'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthedRoute: typeof AuthedRouteWithChildren
-  AuthGithubRoute: typeof AuthGithubRouteWithChildren
+  AuthGithubRoute: typeof AuthGithubRoute
+  AuthGithubCallbackRoute: typeof AuthGithubCallbackRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -110,12 +111,12 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedWorkoutRouteImport
       parentRoute: typeof AuthedRoute
     }
-    '/auth/github/callback': {
-      id: '/auth/github/callback'
-      path: '/callback'
+    '/auth/github_/callback': {
+      id: '/auth/github_/callback'
+      path: '/auth/github/callback'
       fullPath: '/auth/github/callback'
       preLoaderRoute: typeof AuthGithubCallbackRouteImport
-      parentRoute: typeof AuthGithubRoute
+      parentRoute: typeof rootRouteImport
     }
   }
 }
@@ -131,22 +132,11 @@ const AuthedRouteChildren: AuthedRouteChildren = {
 const AuthedRouteWithChildren =
   AuthedRoute._addFileChildren(AuthedRouteChildren)
 
-interface AuthGithubRouteChildren {
-  AuthGithubCallbackRoute: typeof AuthGithubCallbackRoute
-}
-
-const AuthGithubRouteChildren: AuthGithubRouteChildren = {
-  AuthGithubCallbackRoute: AuthGithubCallbackRoute,
-}
-
-const AuthGithubRouteWithChildren = AuthGithubRoute._addFileChildren(
-  AuthGithubRouteChildren,
-)
-
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthedRoute: AuthedRouteWithChildren,
-  AuthGithubRoute: AuthGithubRouteWithChildren,
+  AuthGithubRoute: AuthGithubRoute,
+  AuthGithubCallbackRoute: AuthGithubCallbackRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
