@@ -66,25 +66,6 @@ function Home() {
     })
   }
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-[#1A1F26] text-slate-100 flex flex-col items-center justify-center p-6">
-        Loading authentication status...
-      </div>
-    )
-  }
-
-  if (error) {
-    return (
-      <div className="min-h-screen bg-[#1A1F26] text-slate-100 flex flex-col items-center justify-center p-6 text-center">
-        <div className="text-lg font-black">Authentication check failed.</div>
-        <p className="mt-2 text-sm text-slate-400">
-          Reload the page and verify the server is reachable.
-        </p>
-      </div>
-    )
-  }
-
   return (
     <div className="min-h-screen bg-[#1A1F26] bg-[radial-gradient(circle_at_top,_var(--tw-gradient-stops))] from-[#2A333E] via-[#1A1F26] to-[#0F1216] px-5 py-8 text-slate-100 sm:px-6 lg:px-8">
       <div className="mx-auto flex min-h-[calc(100vh-4rem)] max-w-6xl items-center">
@@ -128,15 +109,23 @@ function Home() {
             <div className="w-full rounded-[1.8rem] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.08),rgba(255,255,255,0.04))] p-5 shadow-[0_28px_80px_rgba(2,8,23,0.34)] backdrop-blur-2xl">
               <div className="mb-5">
                 <div className="text-[10px] font-black uppercase tracking-[0.22em] text-slate-500">
-                  {user ? 'Ready to train' : 'Sign in'}
+                  {isLoading ? 'Checking session' : user ? 'Ready to train' : 'Sign in'}
                 </div>
                 <div className="mt-2 text-2xl font-black tracking-tight text-slate-50">
-                  {user ? 'Open your workout space.' : 'Use GitHub to enter your workspace.'}
+                  {isLoading
+                    ? 'Checking your workspace access.'
+                    : user
+                      ? 'Open your workout space.'
+                      : 'Use GitHub to enter your workspace.'}
                 </div>
                 <p className="mt-2 text-sm text-slate-400">
-                  {user
-                    ? 'Jump straight back into exercises, timers, and tracking.'
-                    : 'Authentication is required before workout, chat, and body data become available.'}
+                  {error
+                    ? 'Authentication check failed. You can still try signing in again.'
+                    : isLoading
+                      ? 'The app is verifying your current session. You can still continue manually.'
+                      : user
+                        ? 'Jump straight back into exercises, timers, and tracking.'
+                        : 'Authentication is required before workout, chat, and body data become available.'}
                 </p>
               </div>
 
@@ -163,7 +152,7 @@ function Home() {
                     variant="accent"
                     onClick={handleGitHubLogin}
                     className="h-12 w-full justify-between px-4"
-                    disabled={initiateOAuthMutation.isPending}
+                    disabled={initiateOAuthMutation.isPending || logoutMutation.isPending}
                   >
                     <span className="flex items-center gap-2">
                       <GithubIcon size={18} className="text-white" />
