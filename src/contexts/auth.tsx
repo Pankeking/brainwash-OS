@@ -1,6 +1,6 @@
 import { createContext, useContext, type ReactNode } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { getCurrentUserFn } from '~/server/auth'
+import { currentUserQueryOptions } from '~/features/auth/currentUserQuery'
 
 type User = {
   id: string
@@ -17,15 +17,7 @@ type AuthContextType = {
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const {
-    data: user,
-    isLoading,
-    refetch,
-  } = useQuery<User | null>({
-    queryKey: ['currentUser'],
-    queryFn: getCurrentUserFn,
-    staleTime: Infinity,
-  })
+  const { data: user, isLoading, refetch } = useQuery<User | null>(currentUserQueryOptions)
 
   return (
     <AuthContext.Provider value={{ user, isLoading, refetch }}>{children}</AuthContext.Provider>

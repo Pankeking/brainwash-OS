@@ -17,5 +17,6 @@ export {
   removeBodyMetricFn,
   upsertBodyMetricFn,
 } from './workout.metrics'
+export { getWorkoutPageDataFn } from './workout.page'
 export { getWorkoutDayFn, getWorkoutWeeklyCategoryStatsFn } from './workout.queries'
 export { addWorkoutSetFn, removeWorkoutSetFn } from './workout.sets'

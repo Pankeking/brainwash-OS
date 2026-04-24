@@ -1,4 +1,5 @@
 import { createServerFn } from '@tanstack/react-start'
+import type { Types } from 'mongoose'
 
 import connectDB from './db'
 import { appLogInfo } from './logger'
@@ -22,108 +23,115 @@ import { addDaysToDayKey, parseSelectedDayKey } from './workout.utils'
 import { BodyMetricDefinitionModel } from '~/models/BodyMetricDefinition.model'
 import { BodyMeasurementLogModel } from '~/models/BodyMeasurementLog.model'
 
+export async function getBodyMetricsDayData({
+  selectedDay,
+  userId,
+}: {
+  selectedDay: string
+  userId: Types.ObjectId
+}) {
+  const selectedDayKey = parseSelectedDayKey(selectedDay)
+  const historyStartDayKey = addDaysToDayKey(selectedDayKey, -29)
+  const definitions = await getBodyMetricDefinitionsForUser(userId)
+  const [logs, allLogs] = await Promise.all([
+    findBodyMeasurementLogsForRange(userId, historyStartDayKey, selectedDayKey),
+    BodyMeasurementLogModel.find(
+      {
+        userId,
+        'measurements.0': { $exists: true },
+      },
+      {
+        dayKey: 1,
+        measurements: 1,
+      },
+    )
+      .sort({ date: -1 })
+      .lean(),
+  ])
+  const selectedDayLog = logs.find((log) => log.dayKey === selectedDayKey)
+  const latestByMetric = new Map<
+    string,
+    { value: number; unit: 'kg' | 'cm'; loggedAt: string; label: string }
+  >()
+  const metricPoints = new Map<string, Array<{ dayKey: string; value: number; loggedAt: string }>>()
+
+  for (const log of logs) {
+    for (const measurement of (log.measurements || []) as Array<{
+      metricKey: string
+      label: string
+      unit: 'kg' | 'cm'
+      value: number
+      loggedAt: Date
+    }>) {
+      if (!latestByMetric.has(measurement.metricKey)) {
+        latestByMetric.set(measurement.metricKey, {
+          value: measurement.value,
+          unit: measurement.unit,
+          loggedAt: new Date(measurement.loggedAt).toISOString(),
+          label: measurement.label,
+        })
+      }
+    }
+  }
+  for (const log of allLogs) {
+    for (const measurement of (log.measurements || []) as Array<{
+      metricKey: string
+      value: number
+      loggedAt: Date
+    }>) {
+      metricPoints.set(measurement.metricKey, [
+        ...(metricPoints.get(measurement.metricKey) || []),
+        {
+          dayKey: log.dayKey,
+          value: measurement.value,
+          loggedAt: new Date(measurement.loggedAt).toISOString(),
+        },
+      ])
+    }
+  }
+
+  return {
+    definitions,
+    entries:
+      selectedDayLog?.measurements.map(
+        (measurement: {
+          _id?: unknown
+          metricKey: string
+          label: string
+          kind: 'weight' | 'size'
+          unit: 'kg' | 'cm'
+          value: number
+          loggedAt: Date
+        }) => ({
+          id: String(measurement._id),
+          metricKey: measurement.metricKey,
+          label: measurement.label,
+          kind: measurement.kind,
+          unit: measurement.unit,
+          value: measurement.value,
+          loggedAt: new Date(measurement.loggedAt).toISOString(),
+        }),
+      ) || [],
+    latest: Array.from(latestByMetric.entries()).map(([metricKey, value]) => ({
+      metricKey,
+      ...value,
+    })),
+    stats: definitions.map((definition) => ({
+      metricKey: definition.key,
+      label: definition.label,
+      kind: definition.kind,
+      unit: definition.unit,
+      ...buildBodyMetricProgressStats(selectedDayKey, metricPoints.get(definition.key) || []),
+    })),
+  }
+}
+
 export const getBodyMetricsDayFn = createServerFn({ method: 'POST' })
   .inputValidator(workoutDayInputSchema)
   .handler(async ({ data }) => {
     await connectDB()
     const userId = await getAuthenticatedUserObjectId()
-    const selectedDayKey = parseSelectedDayKey(data.selectedDay)
-    const historyStartDayKey = addDaysToDayKey(selectedDayKey, -29)
-    const definitions = await getBodyMetricDefinitionsForUser(userId)
-    const [logs, allLogs] = await Promise.all([
-      findBodyMeasurementLogsForRange(userId, historyStartDayKey, selectedDayKey),
-      BodyMeasurementLogModel.find(
-        {
-          userId,
-          'measurements.0': { $exists: true },
-        },
-        {
-          dayKey: 1,
-          measurements: 1,
-        },
-      )
-        .sort({ date: -1 })
-        .lean(),
-    ])
-    const selectedDayLog = logs.find((log) => log.dayKey === selectedDayKey)
-    const latestByMetric = new Map<
-      string,
-      { value: number; unit: 'kg' | 'cm'; loggedAt: string; label: string }
-    >()
-    const metricPoints = new Map<
-      string,
-      Array<{ dayKey: string; value: number; loggedAt: string }>
-    >()
-
-    for (const log of logs) {
-      for (const measurement of (log.measurements || []) as Array<{
-        metricKey: string
-        label: string
-        unit: 'kg' | 'cm'
-        value: number
-        loggedAt: Date
-      }>) {
-        if (!latestByMetric.has(measurement.metricKey)) {
-          latestByMetric.set(measurement.metricKey, {
-            value: measurement.value,
-            unit: measurement.unit,
-            loggedAt: new Date(measurement.loggedAt).toISOString(),
-            label: measurement.label,
-          })
-        }
-      }
-    }
-    for (const log of allLogs) {
-      for (const measurement of (log.measurements || []) as Array<{
-        metricKey: string
-        value: number
-        loggedAt: Date
-      }>) {
-        metricPoints.set(measurement.metricKey, [
-          ...(metricPoints.get(measurement.metricKey) || []),
-          {
-            dayKey: log.dayKey,
-            value: measurement.value,
-            loggedAt: new Date(measurement.loggedAt).toISOString(),
-          },
-        ])
-      }
-    }
-
-    return {
-      definitions,
-      entries:
-        selectedDayLog?.measurements.map(
-          (measurement: {
-            _id?: unknown
-            metricKey: string
-            label: string
-            kind: 'weight' | 'size'
-            unit: 'kg' | 'cm'
-            value: number
-            loggedAt: Date
-          }) => ({
-            id: String(measurement._id),
-            metricKey: measurement.metricKey,
-            label: measurement.label,
-            kind: measurement.kind,
-            unit: measurement.unit,
-            value: measurement.value,
-            loggedAt: new Date(measurement.loggedAt).toISOString(),
-          }),
-        ) || [],
-      latest: Array.from(latestByMetric.entries()).map(([metricKey, value]) => ({
-        metricKey,
-        ...value,
-      })),
-      stats: definitions.map((definition) => ({
-        metricKey: definition.key,
-        label: definition.label,
-        kind: definition.kind,
-        unit: definition.unit,
-        ...buildBodyMetricProgressStats(selectedDayKey, metricPoints.get(definition.key) || []),
-      })),
-    }
+    return getBodyMetricsDayData({ selectedDay: data.selectedDay, userId })
   })
 
 export const upsertBodyMetricFn = createServerFn({ method: 'POST' })

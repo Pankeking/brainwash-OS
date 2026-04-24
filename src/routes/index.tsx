@@ -129,7 +129,7 @@ function Home() {
               <div className="space-y-3">
                 {user ? (
                   <>
-                    <Link to="/workout" className="block">
+                    <Link to="/workout" preload="render" className="block">
                       <Button variant="accent" className="h-12 w-full justify-between px-4">
                         Open exercises
                         <ArrowRight size={16} />

@@ -2,6 +2,11 @@ import { createFileRoute, Link } from '@tanstack/react-router'
 import { ChevronLeft } from 'lucide-react'
 
 import { Chat, WeeklyCalendar, WorkoutTimers } from '~/components/components'
+import {
+  getBodyMetricsDayQueryOptions,
+  getWorkoutDayQueryOptions,
+  getWorkoutWeeklyCategoryStatsQueryOptions,
+} from '~/features/workout/workout.query-options'
 import { WorkoutBodyTab } from '~/features/workout/WorkoutBodyTab'
 import { WorkoutCategoriesTab } from '~/features/workout/WorkoutCategoriesTab'
 import { WORKOUT_TIME_ZONE } from '~/features/workout/workout.constants'
@@ -12,26 +17,37 @@ import { WorkoutNoticeBanner } from '~/features/workout/WorkoutNoticeBanner'
 import { useWorkoutPageController } from '~/features/workout/useWorkoutPageController'
 import { WorkoutTabBar } from '~/features/workout/WorkoutTabBar'
 import { dayKeyFromDateInTimeZone } from '~/server/dayKey'
-import {
-  getBodyMetricsDayFn,
-  getWorkoutDayFn,
-  getWorkoutWeeklyCategoryStatsFn,
-} from '~/server/workout'
+import { getWorkoutPageDataFn } from '~/server/workout'
+
+const INITIAL_WEEKS_TO_SHOW = 4
 
 export const Route = createFileRoute('/_authed/workout')({
-  loader: async () => {
+  pendingComponent: WorkoutPendingView,
+  pendingMs: 0,
+  loader: async ({ context }) => {
     const selectedDay = dayKeyFromDateInTimeZone(new Date(), WORKOUT_TIME_ZONE)
-    const [workoutDayData, weeklyStatsData, bodyMetricsData] = await Promise.all([
-      getWorkoutDayFn({ data: { selectedDay } }),
-      getWorkoutWeeklyCategoryStatsFn({ data: { weeks: 4 } }),
-      getBodyMetricsDayFn({ data: { selectedDay } }),
-    ])
+    const pageData = await getWorkoutPageDataFn({
+      data: {
+        selectedDay,
+        weeks: INITIAL_WEEKS_TO_SHOW,
+      },
+    })
+
+    context.queryClient.setQueryData(
+      getWorkoutDayQueryOptions(pageData.selectedDay).queryKey,
+      pageData.workoutDayData,
+    )
+    context.queryClient.setQueryData(
+      getWorkoutWeeklyCategoryStatsQueryOptions(INITIAL_WEEKS_TO_SHOW).queryKey,
+      pageData.weeklyStatsData,
+    )
+    context.queryClient.setQueryData(
+      getBodyMetricsDayQueryOptions(pageData.selectedDay).queryKey,
+      pageData.bodyMetricsData,
+    )
 
     return {
-      bodyMetricsData,
-      selectedDay,
-      weeklyStatsData,
-      workoutDayData,
+      selectedDay: pageData.selectedDay,
     }
   },
   component: WorkoutView,
@@ -183,6 +199,25 @@ function WorkoutView() {
           }}
           onWorkoutDataChanged={controller.onAssistantWorkoutChanged}
         />
+      </div>
+    </div>
+  )
+}
+
+function WorkoutPendingView() {
+  return (
+    <div className="min-h-screen bg-[#0b1118] px-4 pb-32 pt-5 font-sans text-slate-100 sm:px-5">
+      <div className="mx-auto max-w-5xl">
+        <div className="absolute inset-x-0 top-0 -z-10 h-[26rem] bg-[radial-gradient(circle_at_top,rgba(251,146,60,0.15),transparent_36%),radial-gradient(circle_at_20%_20%,rgba(56,189,248,0.12),transparent_28%),linear-gradient(180deg,#101720_0%,#0b1118_60%)]" />
+        <header className="mb-6 flex items-center justify-between pt-2">
+          <div className="h-10 w-10 rounded-2xl border border-white/8 bg-white/5" />
+          <div className="h-8 w-28 rounded-full border border-white/8 bg-white/5" />
+        </header>
+        <div className="mb-5 h-28 rounded-[1.75rem] border border-white/8 bg-white/4 backdrop-blur-xl" />
+        <div className="mb-4 h-14 rounded-[1.5rem] border border-white/8 bg-white/4 backdrop-blur-xl" />
+        <div className="rounded-[1.75rem] border border-white/8 bg-white/4 py-10 text-center text-sm text-slate-400 backdrop-blur-xl">
+          Loading workout data...
+        </div>
       </div>
     </div>
   )

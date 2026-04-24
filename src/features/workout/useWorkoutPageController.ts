@@ -3,13 +3,13 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { SetType } from '~/enums/enums'
 import { parseLocaleNumberInput } from '~/lib/number-input'
-import {
-  getBodyMetricsDayFn,
-  getWorkoutDayFn,
-  getWorkoutWeeklyCategoryStatsFn,
-} from '~/server/workout'
 
 import { WORKOUT_CATEGORY_COLORS } from './workout.constants'
+import {
+  getBodyMetricsDayQueryOptions,
+  getWorkoutDayQueryOptions,
+  getWorkoutWeeklyCategoryStatsQueryOptions,
+} from './workout.query-options'
 import {
   buildLatestLogTimestampByExercise,
   buildLogCountByExercise,
@@ -29,17 +29,14 @@ import { useWorkoutExerciseMutations } from './useWorkoutExerciseMutations'
 import { useWorkoutSetMutations } from './useWorkoutSetMutations'
 
 interface WorkoutLoaderData {
-  bodyMetricsData: BodyMetricsDayData
   selectedDay: string
-  weeklyStatsData: WeeklyCategoryStatsData
-  workoutDayData: {
-    categories: WorkoutCategory[]
-    exercises: WorkoutExercise[]
-    logs: WorkoutLog[]
-  }
 }
 
-type WorkoutDayQueryData = WorkoutLoaderData['workoutDayData']
+type WorkoutDayQueryData = {
+  categories: WorkoutCategory[]
+  exercises: WorkoutExercise[]
+  logs: WorkoutLog[]
+}
 
 export function useWorkoutPageController(loaderData: WorkoutLoaderData) {
   const queryClient = useQueryClient()
@@ -63,31 +60,12 @@ export function useWorkoutPageController(loaderData: WorkoutLoaderData) {
     setTimerAutoStartToken((current) => current + 1)
   }
 
-  const initialWorkoutDayData: WorkoutDayQueryData | undefined =
-    selectedDay === loaderData.selectedDay ? loaderData.workoutDayData : undefined
-
-  const { data, isLoading } = useQuery<WorkoutDayQueryData>({
-    queryKey: ['workout-day', selectedDay],
-    queryFn: () => getWorkoutDayFn({ data: { selectedDay } }),
-    initialData: initialWorkoutDayData,
-    staleTime: 30_000,
-    refetchOnWindowFocus: false,
-  })
+  const { data, isLoading } = useQuery<WorkoutDayQueryData>(getWorkoutDayQueryOptions(selectedDay))
   const { data: weeklyStatsData, isLoading: isWeeklyStatsLoading } =
-    useQuery<WeeklyCategoryStatsData>({
-      queryKey: ['workout-weekly-category-stats', weeksToShow],
-      queryFn: () => getWorkoutWeeklyCategoryStatsFn({ data: { weeks: weeksToShow } }),
-      initialData: weeksToShow === 4 ? loaderData.weeklyStatsData : undefined,
-      staleTime: 30_000,
-      refetchOnWindowFocus: false,
-    })
-  const { data: bodyMetricsData } = useQuery<BodyMetricsDayData>({
-    queryKey: ['body-metrics-day', selectedDay],
-    queryFn: () => getBodyMetricsDayFn({ data: { selectedDay } }),
-    initialData: selectedDay === loaderData.selectedDay ? loaderData.bodyMetricsData : undefined,
-    staleTime: 30_000,
-    refetchOnWindowFocus: false,
-  })
+    useQuery<WeeklyCategoryStatsData>(getWorkoutWeeklyCategoryStatsQueryOptions(weeksToShow))
+  const { data: bodyMetricsData } = useQuery<BodyMetricsDayData>(
+    getBodyMetricsDayQueryOptions(selectedDay),
+  )
 
   const categories: WorkoutCategory[] = data?.categories || []
   const exercises: WorkoutExercise[] = data?.exercises || []
