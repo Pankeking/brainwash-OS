@@ -1,8 +1,5 @@
 import type mongoose from 'mongoose'
 
-import { BodyMetricDefinitionModel } from '~/models/BodyMetricDefinition.model'
-import { BodyMeasurementLogModel } from '~/models/BodyMeasurementLog.model'
-
 import { createLogTimestampForDayKey, getUtcRangeForDayKey } from './dayKey'
 import { APP_TIMEZONE, parseSelectedDayKey } from './workout.utils'
 
@@ -21,6 +18,16 @@ type PersistedMeasurement = {
   unit: 'kg' | 'cm'
 }
 
+async function getBodyMetricDefinitionModel() {
+  const { BodyMetricDefinitionModel } = await import('~/models/BodyMetricDefinition.model')
+  return BodyMetricDefinitionModel
+}
+
+async function getBodyMeasurementLogModel() {
+  const { BodyMeasurementLogModel } = await import('~/models/BodyMeasurementLog.model')
+  return BodyMeasurementLogModel
+}
+
 function buildMetricDefinitionFromMeasurement(
   measurement: PersistedMeasurement,
 ): BodyMetricDefinition {
@@ -34,6 +41,7 @@ function buildMetricDefinitionFromMeasurement(
 }
 
 async function getInferredBodyMetricDefinitionsFromLogs(userId: mongoose.Types.ObjectId) {
+  const BodyMeasurementLogModel = await getBodyMeasurementLogModel()
   const logs = await BodyMeasurementLogModel.find(
     {
       userId,
@@ -74,6 +82,7 @@ export function toBodyMetricKey(label: string) {
 }
 
 export async function getBodyMetricDefinitionsForUser(userId: mongoose.Types.ObjectId) {
+  const BodyMetricDefinitionModel = await getBodyMetricDefinitionModel()
   const customDefinitions = await BodyMetricDefinitionModel.find({ userId })
     .sort({ createdAt: 1 })
     .lean()
@@ -101,6 +110,10 @@ export async function getBodyMetricDefinitionForUser(
   userId: mongoose.Types.ObjectId,
   metricKeyOrLabel: string,
 ) {
+  const [BodyMetricDefinitionModel, BodyMeasurementLogModel] = await Promise.all([
+    getBodyMetricDefinitionModel(),
+    getBodyMeasurementLogModel(),
+  ])
   const normalized = metricKeyOrLabel.trim().toLowerCase()
   const escapedLabel = metricKeyOrLabel.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
@@ -147,6 +160,7 @@ export async function findOrCreateBodyMeasurementLogForDay(
   userId: mongoose.Types.ObjectId,
   selectedDay: string,
 ) {
+  const BodyMeasurementLogModel = await getBodyMeasurementLogModel()
   const dayKey = parseSelectedDayKey(selectedDay)
   const existing = await BodyMeasurementLogModel.findOne({
     userId,
@@ -187,6 +201,7 @@ export async function findBodyMeasurementLogsForRange(
   fromDayKey: string,
   toDayKey: string,
 ) {
+  const BodyMeasurementLogModel = await getBodyMeasurementLogModel()
   const start = getUtcRangeForDayKey(fromDayKey, APP_TIMEZONE).start
   const end = getUtcRangeForDayKey(toDayKey, APP_TIMEZONE).end
 

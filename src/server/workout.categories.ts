@@ -1,22 +1,40 @@
-import mongoose from 'mongoose'
 import { createServerFn } from '@tanstack/react-start'
 
-import { ExerciseCategoryModel } from '~/models/ExerciseCategory.model'
-import { ExerciseModel } from '~/models/Exercise.model'
-
-import connectDB from './db'
-import { getAuthenticatedUserObjectId } from './workout.auth'
 import {
   categoryIdInputSchema,
   categoryInputSchema,
   updateCategoryColorInputSchema,
 } from './workout.schemas'
 
+async function getCategoryMutationContext() {
+  const [
+    { default: mongoose },
+    { default: connectDB },
+    { ExerciseCategoryModel },
+    { ExerciseModel },
+    { getAuthenticatedUserObjectId },
+  ] = await Promise.all([
+    import('mongoose'),
+    import('./db'),
+    import('~/models/ExerciseCategory.model'),
+    import('~/models/Exercise.model'),
+    import('./workout.auth'),
+  ])
+  await connectDB()
+  const userId = await getAuthenticatedUserObjectId()
+
+  return {
+    ExerciseCategoryModel,
+    ExerciseModel,
+    mongoose,
+    userId,
+  }
+}
+
 export const addWorkoutCategoryFn = createServerFn({ method: 'POST' })
   .inputValidator(categoryInputSchema)
   .handler(async ({ data }) => {
-    await connectDB()
-    const userId = await getAuthenticatedUserObjectId()
+    const { ExerciseCategoryModel, userId } = await getCategoryMutationContext()
 
     const existing = await ExerciseCategoryModel.findOne({
       userId,
@@ -38,8 +56,8 @@ export const addWorkoutCategoryFn = createServerFn({ method: 'POST' })
 export const removeWorkoutCategoryFn = createServerFn({ method: 'POST' })
   .inputValidator(categoryIdInputSchema)
   .handler(async ({ data }) => {
-    await connectDB()
-    const userId = await getAuthenticatedUserObjectId()
+    const { ExerciseCategoryModel, ExerciseModel, mongoose, userId } =
+      await getCategoryMutationContext()
     const categoryObjectId = new mongoose.Types.ObjectId(data.categoryId)
 
     await ExerciseCategoryModel.deleteOne({ _id: categoryObjectId, userId })
@@ -51,8 +69,7 @@ export const removeWorkoutCategoryFn = createServerFn({ method: 'POST' })
 export const updateWorkoutCategoryColorFn = createServerFn({ method: 'POST' })
   .inputValidator(updateCategoryColorInputSchema)
   .handler(async ({ data }) => {
-    await connectDB()
-    const userId = await getAuthenticatedUserObjectId()
+    const { ExerciseCategoryModel, mongoose, userId } = await getCategoryMutationContext()
 
     await ExerciseCategoryModel.updateOne(
       {

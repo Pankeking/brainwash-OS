@@ -2,11 +2,7 @@ import type mongoose from 'mongoose'
 import { createServerFn } from '@tanstack/react-start'
 
 import type { SetType } from '~/enums/enums'
-import { ExerciseCategoryModel } from '~/models/ExerciseCategory.model'
-import { ExerciseModel } from '~/models/Exercise.model'
-import { WorkoutLogModel } from '~/models/WorkoutLog.model'
 
-import connectDB from './db'
 import { appLogError, appLogInfo } from './logger'
 import { dayKeyFromDateInTimeZone, getUtcRangeForDayKey } from './dayKey'
 import {
@@ -14,7 +10,6 @@ import {
   collectWeeklyVolumeByExercise,
   mapWorkoutExercises,
 } from './workout.query-helpers'
-import { getAuthenticatedUserObjectId } from './workout.auth'
 import { weeklyCategoryStatsInputSchema, workoutDayInputSchema } from './workout.schemas'
 import {
   APP_TIMEZONE,
@@ -27,6 +22,29 @@ import {
   setToNumericValue,
 } from './workout.utils'
 
+async function getWorkoutQueryModels() {
+  const [{ ExerciseCategoryModel }, { ExerciseModel }, { WorkoutLogModel }] = await Promise.all([
+    import('~/models/ExerciseCategory.model'),
+    import('~/models/Exercise.model'),
+    import('~/models/WorkoutLog.model'),
+  ])
+
+  return {
+    ExerciseCategoryModel,
+    ExerciseModel,
+    WorkoutLogModel,
+  }
+}
+
+async function getWorkoutQueryUserId() {
+  const [{ default: connectDB }, { getAuthenticatedUserObjectId }] = await Promise.all([
+    import('./db'),
+    import('./workout.auth'),
+  ])
+  await connectDB()
+  return getAuthenticatedUserObjectId()
+}
+
 export async function getWorkoutDayData({
   selectedDay,
   userId,
@@ -34,6 +52,7 @@ export async function getWorkoutDayData({
   selectedDay: string
   userId: mongoose.Types.ObjectId
 }) {
+  const { ExerciseCategoryModel, ExerciseModel, WorkoutLogModel } = await getWorkoutQueryModels()
   const selectedDayKey = parseSelectedDayKey(selectedDay)
   const todayDayKey = dayKeyFromDateInTimeZone(new Date(), APP_TIMEZONE)
   const weekRange = getRollingRangeFromDayKey(todayDayKey, 7)
@@ -173,8 +192,7 @@ export const getWorkoutDayFn = createServerFn({ method: 'POST' })
   .inputValidator(workoutDayInputSchema)
   .handler(async ({ data }) => {
     try {
-      await connectDB()
-      const userId = await getAuthenticatedUserObjectId()
+      const userId = await getWorkoutQueryUserId()
       const result = await getWorkoutDayData({
         selectedDay: data.selectedDay,
         userId,
@@ -203,6 +221,7 @@ export async function getWorkoutWeeklyCategoryStatsData({
   userId: mongoose.Types.ObjectId
   weeks: number
 }) {
+  const { ExerciseCategoryModel, ExerciseModel, WorkoutLogModel } = await getWorkoutQueryModels()
   const todayDayKey = dayKeyFromDateInTimeZone(new Date(), APP_TIMEZONE)
   const currentWeekStartDayKey = getWeekStartDayKey(todayDayKey)
   const weekRanges = Array.from({ length: weeks }).map((_, index) => {
@@ -286,7 +305,6 @@ export async function getWorkoutWeeklyCategoryStatsData({
 export const getWorkoutWeeklyCategoryStatsFn = createServerFn({ method: 'POST' })
   .inputValidator(weeklyCategoryStatsInputSchema)
   .handler(async ({ data }) => {
-    await connectDB()
-    const userId = await getAuthenticatedUserObjectId()
+    const userId = await getWorkoutQueryUserId()
     return getWorkoutWeeklyCategoryStatsData({ userId, weeks: data.weeks })
   })

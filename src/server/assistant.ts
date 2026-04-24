@@ -1,12 +1,7 @@
-import mongoose from 'mongoose'
+import type { Types } from 'mongoose'
 import { createServerFn } from '@tanstack/react-start'
 import { z } from 'zod'
-import { useAppSession } from '~/utils/session'
-import { BodyMetricDefinitionModel } from '~/models/BodyMetricDefinition.model'
-import { ExerciseModel } from '~/models/Exercise.model'
-import { WorkoutLogModel } from '~/models/WorkoutLog.model'
 import { SetType, Weekday } from '~/enums/enums'
-import connectDB from './db'
 import { ASSISTANT_MASTER_PROMPT, ASSISTANT_SKILLS } from './assistant.prompts'
 import {
   findOrCreateBodyMeasurementLogForDay,
@@ -25,6 +20,26 @@ import {
 } from './dayKey'
 
 const APP_TIMEZONE = 'Europe/Berlin'
+
+async function connectAssistantDB() {
+  const { default: connectDB } = await import('./db')
+  await connectDB()
+}
+
+async function getAssistantExerciseModel() {
+  const { ExerciseModel } = await import('~/models/Exercise.model')
+  return ExerciseModel
+}
+
+async function getAssistantWorkoutLogModel() {
+  const { WorkoutLogModel } = await import('~/models/WorkoutLog.model')
+  return WorkoutLogModel
+}
+
+async function getAssistantBodyMetricDefinitionModel() {
+  const { BodyMetricDefinitionModel } = await import('~/models/BodyMetricDefinition.model')
+  return BodyMetricDefinitionModel
+}
 
 const assistantChatInputSchema = z.object({
   message: z.string().min(1).max(1000),
@@ -87,6 +102,10 @@ function getWeekdayFromDayKey(dayKey: string): Weekday {
 }
 
 async function getAuthenticatedUserObjectId() {
+  const [{ default: mongoose }, { useAppSession }] = await Promise.all([
+    import('mongoose'),
+    import('~/utils/session'),
+  ])
   const session = await useAppSession()
   const userId = session.data.userId
   if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
@@ -278,8 +297,8 @@ function buildSuggestions(payload: {
 }
 
 async function logAssistantSet(payload: {
-  userId: mongoose.Types.ObjectId
-  exercises: Array<{ _id: mongoose.Types.ObjectId | string; name: string }>
+  userId: Types.ObjectId
+  exercises: Array<{ _id: Types.ObjectId | string; name: string }>
   exerciseName: string
   setType: 'reps' | 'timed'
   value: number
@@ -287,6 +306,10 @@ async function logAssistantSet(payload: {
   activeTab?: 'time' | 'categories' | 'exercises' | 'body' | 'history'
   model: string | null
 }) {
+  const [{ default: mongoose }, WorkoutLogModel] = await Promise.all([
+    import('mongoose'),
+    getAssistantWorkoutLogModel(),
+  ])
   const contextSelectedDay = resolveSelectedDayKey(payload.selectedDay, APP_TIMEZONE)
   if (payload.activeTab && payload.activeTab !== 'exercises') {
     return {
@@ -365,7 +388,7 @@ async function logAssistantSet(payload: {
     }
   }
   let exerciseEntry = workoutLog.exercises.find(
-    (entry: { exercise: { exerciseId: mongoose.Types.ObjectId | string } }) =>
+    (entry: { exercise: { exerciseId: Types.ObjectId | string } }) =>
       String(entry.exercise.exerciseId) === String(exerciseObjectId),
   )
   if (!exerciseEntry) {
@@ -419,7 +442,7 @@ async function logAssistantSet(payload: {
 }
 
 async function logAssistantBodyMetric(payload: {
-  userId: mongoose.Types.ObjectId
+  userId: Types.ObjectId
   metricName: string
   value: number
   selectedDay?: string
@@ -478,7 +501,7 @@ async function logAssistantBodyMetric(payload: {
 }
 
 async function createAssistantBodyMetricDefinition(payload: {
-  userId: mongoose.Types.ObjectId
+  userId: Types.ObjectId
   label: string
   kind: 'weight' | 'size'
   selectedDay?: string
@@ -510,6 +533,7 @@ async function createAssistantBodyMetricDefinition(payload: {
     }
   }
 
+  const BodyMetricDefinitionModel = await getAssistantBodyMetricDefinitionModel()
   await BodyMetricDefinitionModel.findOneAndUpdate(
     {
       userId: payload.userId,
@@ -705,10 +729,11 @@ export const assistantChatFn = createServerFn({ method: 'POST' })
   .inputValidator(assistantChatInputSchema)
   .handler(async ({ data }) => {
     try {
-      await connectDB()
+      await connectAssistantDB()
       const userId = await getAuthenticatedUserObjectId()
 
       const contextSelectedDay = resolveSelectedDayKey(data.context?.selectedDay, APP_TIMEZONE)
+      const ExerciseModel = await getAssistantExerciseModel()
       const exercises = await ExerciseModel.find({ userId }).lean()
       const bodyMetricDefinitions = await getBodyMetricDefinitionsForUser(userId)
       const exerciseNames = exercises.map((exercise) => exercise.name)
@@ -724,7 +749,7 @@ export const assistantChatFn = createServerFn({ method: 'POST' })
         const quickResult = await logAssistantSet({
           userId,
           exercises: exercises.map((exercise) => ({
-            _id: exercise._id as mongoose.Types.ObjectId | string,
+            _id: exercise._id as Types.ObjectId | string,
             name: exercise.name,
           })),
           exerciseName: quickIntent.exerciseName,
@@ -791,7 +816,7 @@ export const assistantChatFn = createServerFn({ method: 'POST' })
         return logAssistantSet({
           userId,
           exercises: exercises.map((exercise) => ({
-            _id: exercise._id as mongoose.Types.ObjectId | string,
+            _id: exercise._id as Types.ObjectId | string,
             name: exercise.name,
           })),
           exerciseName: inferredIntent.exerciseName,
@@ -862,13 +887,14 @@ export const assistantLogDirectFn = createServerFn({ method: 'POST' })
   .inputValidator(assistantLogDirectInputSchema)
   .handler(async ({ data }) => {
     try {
-      await connectDB()
+      await connectAssistantDB()
       const userId = await getAuthenticatedUserObjectId()
+      const ExerciseModel = await getAssistantExerciseModel()
       const exercises = await ExerciseModel.find({ userId }).lean()
       return await logAssistantSet({
         userId,
         exercises: exercises.map((exercise) => ({
-          _id: exercise._id as mongoose.Types.ObjectId | string,
+          _id: exercise._id as Types.ObjectId | string,
           name: exercise.name,
         })),
         exerciseName: data.exerciseName,

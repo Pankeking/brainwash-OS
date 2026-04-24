@@ -1,12 +1,6 @@
-import mongoose from 'mongoose'
 import { createServerFn } from '@tanstack/react-start'
 
-import { ExerciseModel } from '~/models/Exercise.model'
-import { WorkoutLogModel } from '~/models/WorkoutLog.model'
-
-import connectDB from './db'
 import { appLogInfo } from './logger'
-import { getAuthenticatedUserObjectId } from './workout.auth'
 import {
   exerciseCreateInputSchema,
   removeExerciseInputSchema,
@@ -15,11 +9,35 @@ import {
   updateExerciseWeeklyGoalInputSchema,
 } from './workout.schemas'
 
+async function getExerciseMutationContext() {
+  const [
+    { default: mongoose },
+    { default: connectDB },
+    { ExerciseModel },
+    { WorkoutLogModel },
+    { getAuthenticatedUserObjectId },
+  ] = await Promise.all([
+    import('mongoose'),
+    import('./db'),
+    import('~/models/Exercise.model'),
+    import('~/models/WorkoutLog.model'),
+    import('./workout.auth'),
+  ])
+  await connectDB()
+  const userId = await getAuthenticatedUserObjectId()
+
+  return {
+    ExerciseModel,
+    WorkoutLogModel,
+    mongoose,
+    userId,
+  }
+}
+
 export const addWorkoutExerciseFn = createServerFn({ method: 'POST' })
   .inputValidator(exerciseCreateInputSchema)
   .handler(async ({ data }) => {
-    await connectDB()
-    const userId = await getAuthenticatedUserObjectId()
+    const { ExerciseModel, userId } = await getExerciseMutationContext()
     const name = data.name.trim()
 
     await ExerciseModel.findOneAndUpdate(
@@ -44,8 +62,7 @@ export const addWorkoutExerciseFn = createServerFn({ method: 'POST' })
 export const removeWorkoutExerciseFn = createServerFn({ method: 'POST' })
   .inputValidator(removeExerciseInputSchema)
   .handler(async ({ data }) => {
-    await connectDB()
-    const userId = await getAuthenticatedUserObjectId()
+    const { ExerciseModel, WorkoutLogModel, mongoose, userId } = await getExerciseMutationContext()
     const exerciseId = new mongoose.Types.ObjectId(data.exerciseId)
 
     await ExerciseModel.deleteOne({ _id: exerciseId, userId })
@@ -60,8 +77,7 @@ export const removeWorkoutExerciseFn = createServerFn({ method: 'POST' })
 export const renameWorkoutExerciseFn = createServerFn({ method: 'POST' })
   .inputValidator(renameExerciseInputSchema)
   .handler(async ({ data }) => {
-    await connectDB()
-    const userId = await getAuthenticatedUserObjectId()
+    const { ExerciseModel, mongoose, userId } = await getExerciseMutationContext()
     const nextName = data.nextName.trim()
 
     const duplicate = await ExerciseModel.findOne({
@@ -84,8 +100,7 @@ export const renameWorkoutExerciseFn = createServerFn({ method: 'POST' })
 export const updateWorkoutExerciseWeeklyGoalFn = createServerFn({ method: 'POST' })
   .inputValidator(updateExerciseWeeklyGoalInputSchema)
   .handler(async ({ data }) => {
-    await connectDB()
-    const userId = await getAuthenticatedUserObjectId()
+    const { ExerciseModel, mongoose, userId } = await getExerciseMutationContext()
     const updated = await ExerciseModel.findOneAndUpdate(
       { _id: new mongoose.Types.ObjectId(data.exerciseId), userId },
       {
@@ -126,8 +141,7 @@ export const updateWorkoutExerciseWeeklyGoalFn = createServerFn({ method: 'POST'
 export const toggleWorkoutExerciseCategoryFn = createServerFn({ method: 'POST' })
   .inputValidator(toggleExerciseCategoryInputSchema)
   .handler(async ({ data }) => {
-    await connectDB()
-    const userId = await getAuthenticatedUserObjectId()
+    const { ExerciseModel, mongoose, userId } = await getExerciseMutationContext()
     const exerciseId = new mongoose.Types.ObjectId(data.exerciseId)
     const categoryObjectId = new mongoose.Types.ObjectId(data.categoryId)
 
@@ -137,11 +151,11 @@ export const toggleWorkoutExerciseCategoryFn = createServerFn({ method: 'POST' }
     }
 
     const exists = (exercise.categories || []).some(
-      (value: mongoose.Types.ObjectId | string) => String(value) === String(categoryObjectId),
+      (value: unknown) => String(value) === String(categoryObjectId),
     )
     exercise.categories = exists
       ? (exercise.categories || []).filter(
-          (value: mongoose.Types.ObjectId | string) => String(value) !== String(categoryObjectId),
+          (value: unknown) => String(value) !== String(categoryObjectId),
         )
       : [...(exercise.categories || []), categoryObjectId]
 

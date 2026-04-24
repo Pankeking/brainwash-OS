@@ -64,13 +64,16 @@ export function useWorkoutPageController(loaderData: WorkoutLoaderData) {
   const { data, isLoading } = useQuery<WorkoutDayQueryData>(
     getWorkoutDayQueryOptions(loaderData.userId, selectedDay),
   )
+  const shouldLoadSecondaryWorkoutData = Boolean(data)
   const { data: weeklyStatsData, isLoading: isWeeklyStatsLoading } =
-    useQuery<WeeklyCategoryStatsData>(
-      getWorkoutWeeklyCategoryStatsQueryOptions(loaderData.userId, weeksToShow),
-    )
-  const { data: bodyMetricsData } = useQuery<BodyMetricsDayData>(
-    getBodyMetricsDayQueryOptions(loaderData.userId, selectedDay),
-  )
+    useQuery<WeeklyCategoryStatsData>({
+      ...getWorkoutWeeklyCategoryStatsQueryOptions(loaderData.userId, weeksToShow),
+      enabled: shouldLoadSecondaryWorkoutData || activeTab === 'categories',
+    })
+  const { data: bodyMetricsData } = useQuery<BodyMetricsDayData>({
+    ...getBodyMetricsDayQueryOptions(loaderData.userId, selectedDay),
+    enabled: shouldLoadSecondaryWorkoutData || activeTab === 'body',
+  })
 
   const categories: WorkoutCategory[] = data?.categories || []
   const exercises: WorkoutExercise[] = data?.exercises || []

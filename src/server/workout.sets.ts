@@ -1,13 +1,10 @@
-import mongoose from 'mongoose'
+import type { Types } from 'mongoose'
 import { createServerFn } from '@tanstack/react-start'
 
 import { SetType } from '~/enums/enums'
-import { ExerciseModel } from '~/models/Exercise.model'
 
-import connectDB from './db'
 import { createLogTimestampForDayKey } from './dayKey'
 import { appLogInfo } from './logger'
-import { getAuthenticatedUserObjectId } from './workout.auth'
 import { addSetInputSchema, removeSetInputSchema } from './workout.schemas'
 import {
   APP_TIMEZONE,
@@ -16,17 +13,38 @@ import {
   parseSelectedDayKey,
 } from './workout.utils'
 
+async function getSetMutationContext() {
+  const [
+    { default: mongoose },
+    { default: connectDB },
+    { ExerciseModel },
+    { getAuthenticatedUserObjectId },
+  ] = await Promise.all([
+    import('mongoose'),
+    import('./db'),
+    import('~/models/Exercise.model'),
+    import('./workout.auth'),
+  ])
+  await connectDB()
+  const userId = await getAuthenticatedUserObjectId()
+
+  return {
+    ExerciseModel,
+    mongoose,
+    userId,
+  }
+}
+
 export const addWorkoutSetFn = createServerFn({ method: 'POST' })
   .inputValidator(addSetInputSchema)
   .handler(async ({ data }) => {
-    await connectDB()
-    const userId = await getAuthenticatedUserObjectId()
+    const { ExerciseModel, mongoose, userId } = await getSetMutationContext()
     const selectedDayKey = parseSelectedDayKey(data.selectedDay)
     const exerciseId = new mongoose.Types.ObjectId(data.exerciseId)
     const workoutLog = await findOrCreateWorkoutLogForDay(userId, selectedDayKey)
 
     let exerciseEntry = workoutLog.exercises.find(
-      (entry: { exercise: { exerciseId: mongoose.Types.ObjectId | string } }) =>
+      (entry: { exercise: { exerciseId: Types.ObjectId | string } }) =>
         String(entry.exercise.exerciseId) === String(exerciseId),
     )
     if (!exerciseEntry) {
@@ -75,8 +93,7 @@ export const addWorkoutSetFn = createServerFn({ method: 'POST' })
 export const removeWorkoutSetFn = createServerFn({ method: 'POST' })
   .inputValidator(removeSetInputSchema)
   .handler(async ({ data }) => {
-    await connectDB()
-    const userId = await getAuthenticatedUserObjectId()
+    const { userId } = await getSetMutationContext()
     const selectedDayKey = parseSelectedDayKey(data.selectedDay)
     const isTokenBasedLogId = data.logId.includes('|')
     const [exerciseKeyRaw, setKeyRaw] = data.logId.split(':')
@@ -106,7 +123,7 @@ export const removeWorkoutSetFn = createServerFn({ method: 'POST' })
       if (isTokenBasedLogId) {
         const [exerciseIdToken, loggedAtMsToken, setTypeToken, valueToken] = data.logId.split('|')
         const exerciseIndex = workoutLog.exercises.findIndex(
-          (entry: { exercise: { exerciseId: mongoose.Types.ObjectId | string } }) =>
+          (entry: { exercise: { exerciseId: Types.ObjectId | string } }) =>
             String(entry.exercise.exerciseId) === exerciseIdToken,
         )
         if (exerciseIndex === -1) {
@@ -141,7 +158,7 @@ export const removeWorkoutSetFn = createServerFn({ method: 'POST' })
       }
 
       const exerciseIndex = workoutLog.exercises.findIndex(
-        (entry: { exercise: { exerciseId: mongoose.Types.ObjectId | string } }) =>
+        (entry: { exercise: { exerciseId: Types.ObjectId | string } }) =>
           String(entry.exercise.exerciseId) === exerciseKeyRaw,
       )
       if (exerciseIndex === -1) {
@@ -149,8 +166,7 @@ export const removeWorkoutSetFn = createServerFn({ method: 'POST' })
       }
       const exercise = workoutLog.exercises[exerciseIndex]
       const setIndex = exercise.sets.findIndex(
-        (setEntry: { _id?: mongoose.Types.ObjectId | string }) =>
-          String(setEntry._id) === setKeyRaw,
+        (setEntry: { _id?: Types.ObjectId | string }) => String(setEntry._id) === setKeyRaw,
       )
       if (setIndex === -1) {
         continue

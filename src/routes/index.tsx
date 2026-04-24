@@ -1,17 +1,19 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { ArrowRight, GithubIcon, Sparkles, Timer, Dumbbell } from 'lucide-react'
-import { type MouseEvent, useState } from 'react'
+import { lazy, type MouseEvent, Suspense, useState } from 'react'
 import { useAuth } from '~/contexts/auth'
 import { currentUserQueryOptions } from '~/features/auth/currentUserQuery'
 import { clearWorkoutUserQueries } from '~/features/workout/workout.cache'
 import { logoutFn } from '~/server/auth'
-import { Hero, Chat, Button } from '~/components/components'
-import { getButtonClassName } from '~/components/Button'
+import Hero from '~/components/Hero'
+import Button, { getButtonClassName } from '~/components/Button'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 
 export const Route = createFileRoute('/')({
   component: Home,
 })
+
+const Chat = lazy(() => import('~/components/Chat'))
 
 const GITHUB_LOGIN_HREF = `/auth/github?${new URLSearchParams({ redirect: '/workout' })}`
 
@@ -151,7 +153,9 @@ function Home() {
 
       {user ? (
         <div className="fixed bottom-8 right-8">
-          <Chat />
+          <Suspense fallback={null}>
+            <Chat />
+          </Suspense>
         </div>
       ) : null}
     </div>

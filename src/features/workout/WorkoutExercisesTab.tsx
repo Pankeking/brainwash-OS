@@ -1,6 +1,6 @@
 import { Check, PlusCircle, X } from 'lucide-react'
 
-import { ExerciseActionCard } from '~/components/components'
+import ExerciseActionCard from '~/components/ExerciseActionCard'
 import type { SetType } from '~/enums/enums'
 
 import type { WorkoutCategory, WorkoutExercise } from './workout.types'

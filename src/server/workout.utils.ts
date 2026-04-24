@@ -1,7 +1,6 @@
 import type mongoose from 'mongoose'
 
 import { SetType, Weekday } from '../enums/enums.js'
-import { WorkoutLogModel } from '../models/WorkoutLog.model.js'
 
 import {
   createLogTimestampForDayKey,
@@ -12,6 +11,11 @@ import {
 } from './dayKey.js'
 
 export const APP_TIMEZONE = 'Europe/Berlin'
+
+async function getWorkoutLogModel() {
+  const { WorkoutLogModel } = await import('../models/WorkoutLog.model.js')
+  return WorkoutLogModel
+}
 
 export function parseSelectedDayKey(value: string) {
   if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
@@ -41,6 +45,7 @@ export async function findWorkoutLogsForDay(
   dayKey: string,
   options?: { lean?: boolean },
 ) {
+  const WorkoutLogModel = await getWorkoutLogModel()
   const query = WorkoutLogModel.find({
     userId,
     $or: [{ dayKey }, getLegacyWorkoutLogDateFilter(dayKey)],
@@ -76,6 +81,7 @@ export async function findOrCreateWorkoutLogForDay(
   userId: mongoose.Types.ObjectId,
   dayKey: string,
 ) {
+  const WorkoutLogModel = await getWorkoutLogModel()
   const existingByDayKey = await WorkoutLogModel.findOne({
     userId,
     dayKey,

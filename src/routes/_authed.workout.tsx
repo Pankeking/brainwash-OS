@@ -1,12 +1,9 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { ChevronLeft } from 'lucide-react'
+import { lazy, Suspense } from 'react'
 
-import { Chat, WeeklyCalendar, WorkoutTimers } from '~/components/components'
-import {
-  getBodyMetricsDayQueryOptions,
-  getWorkoutDayQueryOptions,
-  getWorkoutWeeklyCategoryStatsQueryOptions,
-} from '~/features/workout/workout.query-options'
+import WeeklyCalendar from '~/components/WeeklyCalendar'
+import WorkoutTimers from '~/components/WorkoutTimers'
 import { WorkoutBodyTab } from '~/features/workout/WorkoutBodyTab'
 import { WorkoutCategoriesTab } from '~/features/workout/WorkoutCategoriesTab'
 import { WORKOUT_TIME_ZONE } from '~/features/workout/workout.constants'
@@ -17,38 +14,18 @@ import { WorkoutNoticeBanner } from '~/features/workout/WorkoutNoticeBanner'
 import { useWorkoutPageController } from '~/features/workout/useWorkoutPageController'
 import { WorkoutTabBar } from '~/features/workout/WorkoutTabBar'
 import { dayKeyFromDateInTimeZone } from '~/server/dayKey'
-import { getWorkoutPageDataFn } from '~/server/workout'
 
-const INITIAL_WEEKS_TO_SHOW = 4
+const Chat = lazy(() => import('~/components/Chat'))
 
 export const Route = createFileRoute('/_authed/workout')({
   pendingComponent: WorkoutPendingView,
   pendingMs: 0,
   loader: async ({ context }) => {
     const selectedDay = dayKeyFromDateInTimeZone(new Date(), WORKOUT_TIME_ZONE)
-    const pageData = await getWorkoutPageDataFn({
-      data: {
-        selectedDay,
-        weeks: INITIAL_WEEKS_TO_SHOW,
-      },
-    })
-
-    context.queryClient.setQueryData(
-      getWorkoutDayQueryOptions(pageData.userId, pageData.selectedDay).queryKey,
-      pageData.workoutDayData,
-    )
-    context.queryClient.setQueryData(
-      getWorkoutWeeklyCategoryStatsQueryOptions(pageData.userId, INITIAL_WEEKS_TO_SHOW).queryKey,
-      pageData.weeklyStatsData,
-    )
-    context.queryClient.setQueryData(
-      getBodyMetricsDayQueryOptions(pageData.userId, pageData.selectedDay).queryKey,
-      pageData.bodyMetricsData,
-    )
 
     return {
-      selectedDay: pageData.selectedDay,
-      userId: pageData.userId,
+      selectedDay,
+      userId: context.user.id,
     }
   },
   component: WorkoutView,
@@ -193,13 +170,15 @@ function WorkoutView() {
           </section>
         )}
 
-        <Chat
-          context={{
-            selectedDay: controller.selectedDay,
-            activeTab: controller.activeTab,
-          }}
-          onWorkoutDataChanged={controller.onAssistantWorkoutChanged}
-        />
+        <Suspense fallback={null}>
+          <Chat
+            context={{
+              selectedDay: controller.selectedDay,
+              activeTab: controller.activeTab,
+            }}
+            onWorkoutDataChanged={controller.onAssistantWorkoutChanged}
+          />
+        </Suspense>
       </div>
     </div>
   )

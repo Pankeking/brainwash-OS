@@ -1,17 +1,8 @@
 import { createServerFn } from '@tanstack/react-start'
 import type { Types } from 'mongoose'
 
-import connectDB from './db'
 import { appLogInfo } from './logger'
 import { buildBodyMetricProgressStats } from './bodyMetrics.stats'
-import {
-  getBodyMetricDefinitionsForUser,
-  findBodyMeasurementLogsForRange,
-  findOrCreateBodyMeasurementLogForDay,
-  getBodyMetricDefinitionForUser,
-  toBodyMetricKey,
-} from './bodyMetrics.utils'
-import { getAuthenticatedUserObjectId } from './workout.auth'
 import {
   bodyMetricInputSchema,
   createBodyMetricDefinitionInputSchema,
@@ -20,8 +11,25 @@ import {
   workoutDayInputSchema,
 } from './workout.schemas'
 import { addDaysToDayKey, parseSelectedDayKey } from './workout.utils'
-import { BodyMetricDefinitionModel } from '~/models/BodyMetricDefinition.model'
-import { BodyMeasurementLogModel } from '~/models/BodyMeasurementLog.model'
+
+async function getBodyMetricUserId() {
+  const [{ default: connectDB }, { getAuthenticatedUserObjectId }] = await Promise.all([
+    import('./db'),
+    import('./workout.auth'),
+  ])
+  await connectDB()
+  return getAuthenticatedUserObjectId()
+}
+
+async function getBodyMetricDefinitionModel() {
+  const { BodyMetricDefinitionModel } = await import('~/models/BodyMetricDefinition.model')
+  return BodyMetricDefinitionModel
+}
+
+async function getBodyMeasurementLogModel() {
+  const { BodyMeasurementLogModel } = await import('~/models/BodyMeasurementLog.model')
+  return BodyMeasurementLogModel
+}
 
 export async function getBodyMetricsDayData({
   selectedDay,
@@ -30,6 +38,9 @@ export async function getBodyMetricsDayData({
   selectedDay: string
   userId: Types.ObjectId
 }) {
+  const { findBodyMeasurementLogsForRange, getBodyMetricDefinitionsForUser } =
+    await import('./bodyMetrics.utils')
+  const BodyMeasurementLogModel = await getBodyMeasurementLogModel()
   const selectedDayKey = parseSelectedDayKey(selectedDay)
   const historyStartDayKey = addDaysToDayKey(selectedDayKey, -29)
   const definitions = await getBodyMetricDefinitionsForUser(userId)
@@ -129,16 +140,16 @@ export async function getBodyMetricsDayData({
 export const getBodyMetricsDayFn = createServerFn({ method: 'POST' })
   .inputValidator(workoutDayInputSchema)
   .handler(async ({ data }) => {
-    await connectDB()
-    const userId = await getAuthenticatedUserObjectId()
+    const userId = await getBodyMetricUserId()
     return getBodyMetricsDayData({ selectedDay: data.selectedDay, userId })
   })
 
 export const upsertBodyMetricFn = createServerFn({ method: 'POST' })
   .inputValidator(bodyMetricInputSchema)
   .handler(async ({ data }) => {
-    await connectDB()
-    const userId = await getAuthenticatedUserObjectId()
+    const { findOrCreateBodyMeasurementLogForDay, getBodyMetricDefinitionForUser } =
+      await import('./bodyMetrics.utils')
+    const userId = await getBodyMetricUserId()
     const definition = await getBodyMetricDefinitionForUser(userId, data.metricKey)
     if (!definition) {
       throw new Error('Unknown metric')
@@ -177,8 +188,11 @@ export const upsertBodyMetricFn = createServerFn({ method: 'POST' })
 export const createBodyMetricDefinitionFn = createServerFn({ method: 'POST' })
   .inputValidator(createBodyMetricDefinitionInputSchema)
   .handler(async ({ data }) => {
-    await connectDB()
-    const userId = await getAuthenticatedUserObjectId()
+    const { getBodyMetricDefinitionForUser, toBodyMetricKey } = await import('./bodyMetrics.utils')
+    const [BodyMetricDefinitionModel, userId] = await Promise.all([
+      getBodyMetricDefinitionModel(),
+      getBodyMetricUserId(),
+    ])
     const label = data.label.trim()
     const key = toBodyMetricKey(label)
     const unit = data.kind === 'weight' ? 'kg' : 'cm'
@@ -218,8 +232,10 @@ export const createBodyMetricDefinitionFn = createServerFn({ method: 'POST' })
 export const removeBodyMetricDefinitionFn = createServerFn({ method: 'POST' })
   .inputValidator(removeBodyMetricDefinitionInputSchema)
   .handler(async ({ data }) => {
-    await connectDB()
-    const userId = await getAuthenticatedUserObjectId()
+    const [BodyMetricDefinitionModel, userId] = await Promise.all([
+      getBodyMetricDefinitionModel(),
+      getBodyMetricUserId(),
+    ])
 
     await BodyMetricDefinitionModel.deleteOne({
       userId,
@@ -233,8 +249,8 @@ export const removeBodyMetricDefinitionFn = createServerFn({ method: 'POST' })
 export const removeBodyMetricFn = createServerFn({ method: 'POST' })
   .inputValidator(removeBodyMetricInputSchema)
   .handler(async ({ data }) => {
-    await connectDB()
-    const userId = await getAuthenticatedUserObjectId()
+    const { findOrCreateBodyMeasurementLogForDay } = await import('./bodyMetrics.utils')
+    const userId = await getBodyMetricUserId()
     const selectedDayKey = parseSelectedDayKey(data.selectedDay)
     const log = await findOrCreateBodyMeasurementLogForDay(userId, selectedDayKey)
     log.measurements = log.measurements.filter(
