@@ -45,6 +45,7 @@ function ExerciseActionCard({
 }: ExerciseActionCardProps) {
   const repsStorageKey = useMemo(() => `workout-last-value:${id}:${SetType.REPS}`, [id])
   const timedStorageKey = useMemo(() => `workout-last-value:${id}:${SetType.TIMED}`, [id])
+  const cardRef = useRef<HTMLDivElement | null>(null)
   const holdTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const holdIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
@@ -157,12 +158,28 @@ function ExerciseActionCard({
     setSetTargetDraft(setTargetValue ? String(setTargetValue) : '')
   }, [setTargetValue])
 
+  useEffect(() => {
+    if (!isExpanded || typeof window === 'undefined') {
+      return
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      cardRef.current?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start',
+      })
+    }, 80)
+
+    return () => window.clearTimeout(timeoutId)
+  }, [isExpanded])
+
   return (
     <div
+      ref={cardRef}
       onClick={() => !isExpanded && !isEditing && onToggleExpand(id)}
       className={`overflow-hidden rounded-[1.45rem] border border-white/8 transition-all duration-200 ${
         isExpanded
-          ? 'bg-[linear-gradient(180deg,rgba(38,49,63,0.98),rgba(24,31,40,0.96))] p-3 shadow-[0_16px_34px_rgba(2,8,23,0.22)] ring-1 ring-orange-500/16'
+          ? 'bg-[linear-gradient(180deg,rgba(38,49,63,0.98),rgba(24,31,40,0.96))] p-2.5 shadow-[0_16px_34px_rgba(2,8,23,0.22)] ring-1 ring-orange-500/16 sm:p-3'
           : 'bg-[linear-gradient(180deg,rgba(38,49,63,0.92),rgba(27,35,45,0.96))] p-3 shadow-[0_10px_22px_rgba(2,8,23,0.14)] hover:border-white/12 hover:bg-[linear-gradient(180deg,rgba(44,56,72,0.96),rgba(31,40,51,0.98))]'
       }`}
     >
@@ -189,7 +206,7 @@ function ExerciseActionCard({
 
       <div
         className={`transition-all duration-300 ${
-          isExpanded ? 'mt-3 border-t border-white/8 pt-3 opacity-100' : 'max-h-0 opacity-0'
+          isExpanded ? 'mt-2.5 border-t border-white/8 pt-2.5 opacity-100' : 'max-h-0 opacity-0'
         }`}
       >
         {isConfirmingDelete ? (
