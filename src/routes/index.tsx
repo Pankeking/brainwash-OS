@@ -1,16 +1,12 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { ArrowRight, GithubIcon, Sparkles, Timer, Dumbbell } from 'lucide-react'
+import { useState } from 'react'
 import { useAuth } from '~/contexts/auth'
 import { currentUserQueryOptions } from '~/features/auth/currentUserQuery'
 import { clearWorkoutUserQueries } from '~/features/workout/workout.cache'
-import { logoutFn, initiateOAuthFn } from '~/server/auth'
+import { logoutFn } from '~/server/auth'
 import { Hero, Chat, Button } from '~/components/components'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-
-interface InitiateOAuthInput {
-  provider: 'github'
-  redirectTo?: string
-}
 
 export const Route = createFileRoute('/')({
   component: Home,
@@ -36,6 +32,7 @@ function getLoginRedirectTarget(rawRedirect?: string) {
 
 function Home() {
   const { user, error, isLoading, refetch } = useAuth()
+  const [isRedirectingToLogin, setIsRedirectingToLogin] = useState(false)
 
   const queryClient = useQueryClient()
 
@@ -47,23 +44,17 @@ function Home() {
       await refetch()
     },
   })
-  const initiateOAuthMutation = useMutation({
-    mutationFn: (input: InitiateOAuthInput) => initiateOAuthFn({ data: input }),
-    onSuccess: (data) => {
-      window.location.href = data.url
-    },
-  })
-
   const handleLogout = async () => {
     logoutMutation.mutate(undefined)
   }
 
   const handleGitHubLogin = () => {
     const searchParams = new URLSearchParams(window.location.search)
-    initiateOAuthMutation.mutate({
-      provider: 'github',
-      redirectTo: getLoginRedirectTarget(searchParams.get('redirect') || undefined),
-    })
+    const redirectTo = getLoginRedirectTarget(searchParams.get('redirect') || undefined)
+    const nextLocation = new URL('/auth/github', window.location.origin)
+    nextLocation.searchParams.set('redirect', redirectTo)
+    setIsRedirectingToLogin(true)
+    window.location.assign(nextLocation.toString())
   }
 
   return (
@@ -152,11 +143,11 @@ function Home() {
                     variant="accent"
                     onClick={handleGitHubLogin}
                     className="h-12 w-full justify-between px-4"
-                    disabled={initiateOAuthMutation.isPending || logoutMutation.isPending}
+                    disabled={isRedirectingToLogin || logoutMutation.isPending}
                   >
                     <span className="flex items-center gap-2">
                       <GithubIcon size={18} className="text-white" />
-                      {initiateOAuthMutation.isPending ? 'Logging in...' : 'Continue with GitHub'}
+                      {isRedirectingToLogin ? 'Redirecting to GitHub...' : 'Continue with GitHub'}
                     </span>
                     <ArrowRight size={16} />
                   </Button>
